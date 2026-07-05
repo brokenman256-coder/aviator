@@ -1,0 +1,20 @@
+{
+  "name": "aviator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aviator-style crash game for friends, played with virtual credits.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^9.0.3",
+    "socket.io": "^4.7.5"
+  }
+}

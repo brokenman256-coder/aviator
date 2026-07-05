@@ -1,91 +1,52 @@
 (() => {
   "use strict";
 
-  // ---------- Config ----------
-  const WAIT_MS = 5000;
-  const CRASH_FREEZE_MS = 2200;
-  const GROWTH_RATE = 0.00009; // multiplier = e^(GROWTH_RATE * elapsedMs)
-  const STARTING_BALANCE = 1000;
-  const HISTORY_LIMIT = 20;
-  const MAX_CRASH_POINT = 5000;
-
-  // ---------- Provably-fair-style crash point (simulated, client-side) ----------
-  // cyrb53 hash: https://github.com/bryc/code/blob/master/jshash/experimental/cyrb53.js
-  function cyrb53(str, seed = 0) {
-    let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
-    for (let i = 0, ch; i < str.length; i++) {
-      ch = str.charCodeAt(i);
-      h1 = Math.imul(h1 ^ ch, 2654435761);
-      h2 = Math.imul(h2 ^ ch, 1597334677);
-    }
-    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
-    h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
-    h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-    return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+  const token = localStorage.getItem("aviator_token");
+  if (!token) {
+    window.location.href = "login.html";
+    return;
   }
 
-  function randomSeed() {
-    const rand = Math.random().toString(36).slice(2);
-    return `${Date.now().toString(36)}-${rand}`;
-  }
-
-  function generateRound() {
-    const seed = randomSeed();
-    const h = cyrb53(seed); // 0 .. 2^53-1
-    const E = Math.pow(2, 53);
-
-    let point;
-    if (h % 33 === 0) {
-      point = 1.0; // instant crash, baked-in house edge
-    } else {
-      point = Math.floor((100 * E - h) / (E - h)) / 100;
-      if (!isFinite(point) || point < 1) point = 1.0;
-      point = Math.min(point, MAX_CRASH_POINT);
-    }
-    return { seed, hash: h.toString(16), point };
-  }
-
+  const GROWTH_RATE = 0.00009; // must match server/game.js — purely for smooth client-side interpolation
   function multiplierAt(elapsedMs) {
     return Math.exp(GROWTH_RATE * elapsedMs);
   }
 
-  function timeForMultiplier(mult) {
-    return Math.log(mult) / GROWTH_RATE;
-  }
-
-  // ---------- Balance ----------
+  // ---------- Session bootstrap ----------
   const balanceEl = document.getElementById("balanceValue");
-  let balance = Number(localStorage.getItem("aviator_balance"));
-  if (!isFinite(balance) || balance <= 0) balance = STARTING_BALANCE;
+  const usernamePill = document.getElementById("usernamePill");
+  const adminLink = document.getElementById("adminLink");
 
   function setBalance(v) {
-    balance = Math.max(0, v);
-    localStorage.setItem("aviator_balance", String(balance));
-    balanceEl.textContent = balance.toFixed(2);
+    balanceEl.textContent = Number(v).toFixed(2);
   }
-  setBalance(balance);
 
-  document.getElementById("resetBalanceBtn").addEventListener("click", () => {
-    setBalance(STARTING_BALANCE);
-  });
+  function logout() {
+    localStorage.removeItem("aviator_token");
+    localStorage.removeItem("aviator_user");
+    window.location.href = "login.html";
+  }
+  document.getElementById("logoutBtn").addEventListener("click", logout);
 
-  // ---------- Fairness modal ----------
-  const fairnessModal = document.getElementById("fairnessModal");
-  document.getElementById("fairnessBtn").addEventListener("click", () => {
-    fairnessModal.classList.remove("hidden");
-  });
-  document.getElementById("closeFairness").addEventListener("click", () => {
-    fairnessModal.classList.add("hidden");
-  });
-  fairnessModal.addEventListener("click", (e) => {
-    if (e.target === fairnessModal) fairnessModal.classList.add("hidden");
-  });
+  async function loadSelf() {
+    const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return logout();
+    const { user } = await res.json();
+    localStorage.setItem("aviator_user", JSON.stringify(user));
+    usernamePill.textContent = user.username;
+    setBalance(user.balance);
+    if (user.isAdmin) adminLink.classList.remove("section-hidden");
+  }
+  loadSelf();
 
-  function updateFairnessPanel(round) {
-    document.getElementById("fairSeed").textContent = round.seed;
-    document.getElementById("fairHash").textContent = round.hash;
-    document.getElementById("fairCrash").textContent = round.point.toFixed(2) + "x";
+  // ---------- Toast ----------
+  const toastEl = document.getElementById("toast");
+  let toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.remove("hidden");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 3000);
   }
 
   // ---------- History ----------
@@ -98,15 +59,99 @@
     chip.className = `history-chip ${cls}`;
     chip.textContent = point.toFixed(2) + "x";
     historyEl.insertBefore(chip, historyEl.firstChild);
-    while (historyEl.children.length > HISTORY_LIMIT) {
-      historyEl.removeChild(historyEl.lastChild);
-    }
+    while (historyEl.children.length > 20) historyEl.removeChild(historyEl.lastChild);
   }
+
+  // ---------- Socket ----------
+  const socket = io({ auth: { token } });
+
+  socket.on("auth:error", ({ error }) => {
+    toast(error || "Session expired");
+    logout();
+  });
+
+  // ---------- Game state ----------
+  const game = {
+    phase: "waiting", // waiting | running | crashed
+    phaseStartLocal: performance.now(),
+    waitMs: 5000,
+    lastTick: null, // { multiplier, elapsedMs, receivedAt }
+    crashPoint: null,
+    currentMultiplier: 1,
+  };
+
+  socket.on("round:state", (state) => {
+    game.phase = state.state;
+    game.phaseStartLocal = performance.now() - state.msInPhase;
+    game.waitMs = state.waitMs;
+    game.currentMultiplier = state.multiplier;
+  });
+
+  socket.on("round:waiting", ({ waitMs }) => {
+    game.phase = "waiting";
+    game.phaseStartLocal = performance.now();
+    game.waitMs = waitMs;
+    game.lastTick = null;
+    game.crashPoint = null;
+    game.currentMultiplier = 1;
+    multiplierTextEl.classList.remove("flying", "crashed");
+    multiplierTextEl.textContent = "1.00x";
+    ringEl.classList.remove("hidden");
+    betPanels.forEach((p) => p.onRoundReset());
+  });
+
+  socket.on("round:running", () => {
+    game.phase = "running";
+    game.phaseStartLocal = performance.now();
+    game.lastTick = null;
+    ringEl.classList.add("hidden");
+    multiplierTextEl.classList.add("flying");
+    stateTextEl.textContent = "Flying…";
+    betPanels.forEach((p) => p.onRoundStart());
+  });
+
+  socket.on("round:tick", ({ multiplier, elapsedMs }) => {
+    game.lastTick = { multiplier, elapsedMs, receivedAt: performance.now() };
+  });
+
+  socket.on("round:crashed", ({ crashPoint }) => {
+    game.phase = "crashed";
+    game.phaseStartLocal = performance.now();
+    game.crashPoint = crashPoint;
+    game.currentMultiplier = crashPoint;
+    multiplierTextEl.classList.remove("flying");
+    multiplierTextEl.classList.add("crashed");
+    multiplierTextEl.textContent = crashPoint.toFixed(2) + "x";
+    stateTextEl.textContent = "Flew away!";
+    pushHistory(crashPoint);
+    betPanels.forEach((p) => p.onRoundEnd());
+  });
+
+  socket.on("bet:placed", ({ slot, balance }) => {
+    setBalance(balance);
+    betPanels[slot].onPlaced();
+  });
+
+  socket.on("bet:cancelled", ({ slot, balance }) => {
+    setBalance(balance);
+    betPanels[slot].onCancelled();
+  });
+
+  socket.on("bet:cashed_out", ({ slot, multiplier, payout, balance }) => {
+    setBalance(balance);
+    betPanels[slot].onCashedOut(multiplier, payout);
+  });
+
+  socket.on("bet:error", ({ slot, error }) => {
+    toast(error);
+    if (slot !== undefined && betPanels[slot]) betPanels[slot].onError();
+  });
 
   // ---------- Bet panels ----------
   class BetPanel {
-    constructor(rootEl) {
+    constructor(rootEl, slot) {
       this.root = rootEl;
+      this.slot = slot;
       this.amountInput = rootEl.querySelector(".amount-input");
       this.autoEnabled = rootEl.querySelector(".auto-enabled");
       this.autoTarget = rootEl.querySelector(".auto-target");
@@ -114,9 +159,8 @@
       this.actionLabel = rootEl.querySelector(".action-label");
       this.actionAmount = rootEl.querySelector(".action-amount");
 
-      this.status = "idle"; // idle | queued | active | cashedout | lost
+      this.status = "idle"; // idle | pending | placed | active | cashedout | lost
       this.amount = Number(this.amountInput.value) || 10;
-      this.cashOutAt = null;
 
       this._wireTabs();
       this._wirePresets();
@@ -174,81 +218,87 @@
     }
 
     _onAction() {
+      // Always forward the action and let the server (the source of truth for
+      // round phase) accept or reject it — avoids a client-side race where a
+      // click landing right at a phase boundary would otherwise be a silent no-op.
       if (this.status === "idle") {
-        if (this.amount > balance) return;
-        setBalance(balance - this.amount);
-        this.status = "queued";
-      } else if (this.status === "queued") {
-        setBalance(balance + this.amount);
-        this.status = "idle";
+        this.status = "pending";
+        this._render();
+        const autoCashout = this.autoEnabled.checked ? Number(this.autoTarget.value) : null;
+        socket.emit("bet:place", { slot: this.slot, amount: this.amount, autoCashout });
+      } else if (this.status === "placed") {
+        this.status = "pending";
+        this._render();
+        socket.emit("bet:cancel", { slot: this.slot });
       } else if (this.status === "active") {
-        this.cashOut();
+        socket.emit("bet:cashout", { slot: this.slot });
       }
+    }
+
+    onPlaced() {
+      this.status = "placed";
       this._render();
     }
 
-    cashOut() {
-      if (this.status !== "active") return;
-      this.cashOutAt = game.currentMultiplier;
-      const winnings = this.amount * this.cashOutAt;
-      setBalance(balance + winnings);
+    onCancelled() {
+      this.status = "idle";
+      this._render();
+    }
+
+    onCashedOut(multiplier, payout) {
       this.status = "cashedout";
+      this.cashOutAt = multiplier;
+      this.cashOutPayout = payout;
+      this._render();
+    }
+
+    onError() {
+      // Roll back an optimistic "pending" state if the server rejected the action.
+      if (this.status === "pending") this.status = "idle";
       this._render();
     }
 
     onRoundStart() {
-      if (this.status === "queued") {
-        this.status = "active";
-      }
+      if (this.status === "placed") this.status = "active";
+      else if (this.status !== "idle") this.status = "idle";
       this._render();
     }
 
     onRoundEnd() {
-      if (this.status === "active") {
-        this.status = "lost";
-      }
+      if (this.status === "active") this.status = "lost";
       this._render();
     }
 
     onRoundReset() {
       this.status = "idle";
       this.cashOutAt = null;
-      this.amountInput.disabled = false;
-      this.autoTarget.disabled = false;
-      this.autoEnabled.disabled = false;
       this._render();
-    }
-
-    checkAutoCashout() {
-      if (this.status !== "active" || !this.autoEnabled.checked) return;
-      const target = Number(this.autoTarget.value);
-      if (isFinite(target) && game.currentMultiplier >= target) {
-        this.cashOut();
-      }
     }
 
     tickActive() {
       if (this.status !== "active") return;
-      const potential = (this.amount * game.currentMultiplier).toFixed(2);
-      this.actionLabel.textContent = "CASH OUT";
-      this.actionAmount.textContent = potential;
+      this.actionAmount.textContent = (this.amount * game.currentMultiplier).toFixed(2);
     }
 
     _render() {
-      this.actionBtn.classList.remove(
-        "state-bet", "state-queued", "state-active", "state-cashedout", "state-lost"
-      );
-      this.amountInput.disabled = this.status !== "idle";
-      this.autoTarget.disabled = this.status !== "idle";
-      this.autoEnabled.disabled = this.status !== "idle";
+      this.actionBtn.classList.remove("state-bet", "state-queued", "state-active", "state-cashedout", "state-lost");
+      const editable = this.status === "idle";
+      this.amountInput.disabled = !editable;
+      this.autoTarget.disabled = !editable;
+      this.autoEnabled.disabled = !editable;
+      this.actionBtn.disabled = this.status === "pending";
 
       switch (this.status) {
         case "idle":
           this.actionBtn.classList.add("state-bet");
-          this.actionLabel.textContent = "BET";
+          this.actionLabel.textContent = game.phase === "waiting" ? "BET" : "WAIT NEXT ROUND";
           this.actionAmount.textContent = this.amount.toFixed(2);
           break;
-        case "queued":
+        case "pending":
+          this.actionLabel.textContent = "…";
+          this.actionAmount.textContent = this.amount.toFixed(2);
+          break;
+        case "placed":
           this.actionBtn.classList.add("state-queued");
           this.actionLabel.textContent = "CANCEL";
           this.actionAmount.textContent = this.amount.toFixed(2);
@@ -261,7 +311,7 @@
         case "cashedout":
           this.actionBtn.classList.add("state-cashedout");
           this.actionLabel.textContent = "CASHED OUT";
-          this.actionAmount.textContent = (this.cashOutAt.toFixed(2)) + "x won " + (this.amount * this.cashOutAt).toFixed(2);
+          this.actionAmount.textContent = this.cashOutAt.toFixed(2) + "x won " + this.cashOutPayout.toFixed(2);
           break;
         case "lost":
           this.actionBtn.classList.add("state-lost");
@@ -273,7 +323,7 @@
   }
 
   const betPanels = Array.from(document.querySelectorAll(".bet-panel")).map(
-    (el) => new BetPanel(el)
+    (el) => new BetPanel(el, Number(el.dataset.slot))
   );
 
   // ---------- Canvas ----------
@@ -302,7 +352,6 @@
     const toX = (t) => padding + (t / xMax) * (w - padding * 2);
     const toY = (m) => h - padding - ((m - 1) / (yMax - 1)) * (h - padding * 2);
 
-    // grid
     ctx.strokeStyle = "rgba(255,255,255,0.05)";
     ctx.lineWidth = 1;
     for (let i = 1; i <= 4; i++) {
@@ -313,7 +362,6 @@
       ctx.stroke();
     }
 
-    // curve
     const steps = 80;
     const points = [];
     for (let i = 0; i <= steps; i++) {
@@ -322,7 +370,6 @@
       points.push([toX(t), toY(m)]);
     }
 
-    // filled area under curve
     ctx.beginPath();
     ctx.moveTo(toX(0), toY(1));
     points.forEach(([x, y]) => ctx.lineTo(x, y));
@@ -335,7 +382,6 @@
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // stroke line
     ctx.beginPath();
     points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
     ctx.strokeStyle = crashed ? "#ff3b5c" : "#ffffff";
@@ -343,7 +389,6 @@
     ctx.lineJoin = "round";
     ctx.stroke();
 
-    // plane at tip
     const [px, py] = points[points.length - 1];
     ctx.save();
     ctx.translate(px, py);
@@ -358,7 +403,7 @@
     ctx.restore();
   }
 
-  // ---------- Game state machine ----------
+  // ---------- Render loop ----------
   const stateTextEl = document.getElementById("stateText");
   const multiplierTextEl = document.getElementById("multiplierText");
   const ringEl = document.getElementById("countdownRing");
@@ -366,77 +411,34 @@
   const countdownTextEl = document.getElementById("countdownText");
   const RING_CIRC = 283;
 
-  const game = {
-    state: "waiting", // waiting | running | crashed
-    phaseStart: performance.now(),
-    round: null,
-    currentMultiplier: 1,
-  };
-
-  function startWaiting() {
-    game.state = "waiting";
-    game.phaseStart = performance.now();
-    game.round = generateRound();
-    updateFairnessPanel(game.round);
-    ringEl.classList.remove("hidden");
-    multiplierTextEl.classList.remove("flying", "crashed");
-    multiplierTextEl.textContent = "1.00x";
-    betPanels.forEach((p) => p.onRoundReset());
-  }
-
-  function startRunning() {
-    game.state = "running";
-    game.phaseStart = performance.now();
-    ringEl.classList.add("hidden");
-    multiplierTextEl.classList.add("flying");
-    stateTextEl.textContent = "Flying…";
-    betPanels.forEach((p) => p.onRoundStart());
-  }
-
-  function startCrashed() {
-    game.state = "crashed";
-    game.phaseStart = performance.now();
-    multiplierTextEl.classList.remove("flying");
-    multiplierTextEl.classList.add("crashed");
-    multiplierTextEl.textContent = game.round.point.toFixed(2) + "x";
-    stateTextEl.textContent = "Flew away!";
-    pushHistory(game.round.point);
-    betPanels.forEach((p) => p.onRoundEnd());
-  }
-
   function loop() {
     const now = performance.now();
-    const elapsed = now - game.phaseStart;
 
-    if (game.state === "waiting") {
-      const remain = Math.max(0, WAIT_MS - elapsed);
+    if (game.phase === "waiting") {
+      const elapsed = now - game.phaseStartLocal;
+      const remain = Math.max(0, game.waitMs - elapsed);
       stateTextEl.textContent = "Next round in…";
       countdownTextEl.textContent = (remain / 1000).toFixed(1);
-      ringFg.style.strokeDashoffset = String(RING_CIRC * (1 - remain / WAIT_MS));
+      ringFg.style.strokeDashoffset = String(RING_CIRC * (1 - remain / game.waitMs));
       drawFrame(0, 1, false);
-      if (elapsed >= WAIT_MS) startRunning();
-    } else if (game.state === "running") {
-      const m = multiplierAt(elapsed);
-      if (m >= game.round.point) {
-        game.currentMultiplier = game.round.point;
-        drawFrame(timeForMultiplier(game.round.point), game.currentMultiplier, true);
-        startCrashed();
+    } else if (game.phase === "running") {
+      let displayElapsed;
+      if (game.lastTick) {
+        displayElapsed = game.lastTick.elapsedMs + (now - game.lastTick.receivedAt);
       } else {
-        game.currentMultiplier = m;
-        multiplierTextEl.textContent = m.toFixed(2) + "x";
-        drawFrame(elapsed, m, false);
-        betPanels.forEach((p) => {
-          p.checkAutoCashout();
-          p.tickActive();
-        });
+        displayElapsed = now - game.phaseStartLocal;
       }
-    } else if (game.state === "crashed") {
-      if (elapsed >= CRASH_FREEZE_MS) startWaiting();
+      const m = multiplierAt(displayElapsed);
+      game.currentMultiplier = m;
+      multiplierTextEl.textContent = m.toFixed(2) + "x";
+      drawFrame(displayElapsed, m, false);
+      betPanels.forEach((p) => p.tickActive());
+    } else if (game.phase === "crashed") {
+      const t = Math.log(game.crashPoint) / GROWTH_RATE;
+      drawFrame(t, game.crashPoint, true);
     }
 
     requestAnimationFrame(loop);
   }
-
-  startWaiting();
   requestAnimationFrame(loop);
 })();

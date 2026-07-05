@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Aviator</title>
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <div class="app">
@@ -14,12 +14,13 @@
         <span class="brand-name">AVIATOR</span>
       </div>
       <div class="topbar-right">
-        <button id="fairnessBtn" class="ghost-btn" title="Round fairness details">Fairness</button>
+        <span id="usernamePill" class="username-pill"></span>
+        <a id="adminLink" class="ghost-btn section-hidden" href="admin.html">Admin</a>
         <div class="balance">
           <span class="balance-label">Balance</span>
-          <span id="balanceValue" class="balance-value">1000.00</span>
+          <span id="balanceValue" class="balance-value">0.00</span>
         </div>
-        <button id="resetBalanceBtn" class="ghost-btn" title="Reset balance to 1000.00">Reset</button>
+        <button id="logoutBtn" class="ghost-btn">Log out</button>
       </div>
     </header>
 
@@ -28,9 +29,9 @@
     <main class="board">
       <canvas id="canvas"></canvas>
       <div class="overlay">
-        <div id="stateText" class="state-text">Waiting for next round…</div>
+        <div id="stateText" class="state-text">Connecting…</div>
         <div id="multiplierText" class="multiplier-text">1.00x</div>
-        <div id="countdownRing" class="countdown-ring">
+        <div id="countdownRing" class="countdown-ring hidden">
           <svg viewBox="0 0 100 100">
             <circle cx="50" cy="50" r="45" class="ring-bg" />
             <circle cx="50" cy="50" r="45" class="ring-fg" id="ringFg" />
@@ -41,7 +42,7 @@
     </main>
 
     <section class="bets">
-      <div class="bet-panel" data-bet="0">
+      <div class="bet-panel" data-slot="0">
         <div class="bet-tabs">
           <button class="bet-tab active" data-tab="bet">Bet</button>
           <button class="bet-tab" data-tab="auto">Auto</button>
@@ -79,7 +80,7 @@
         </button>
       </div>
 
-      <div class="bet-panel" data-bet="1">
+      <div class="bet-panel" data-slot="1">
         <div class="bet-tabs">
           <button class="bet-tab active" data-tab="bet">Bet</button>
           <button class="bet-tab" data-tab="auto">Auto</button>
@@ -119,25 +120,9 @@
     </section>
   </div>
 
-  <div id="fairnessModal" class="modal hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <span>Round Fairness</span>
-        <button id="closeFairness" class="ghost-btn">✕</button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-note">
-          This is a simulated demo game using virtual currency. The crash point for each round is derived
-          from a fresh random seed hashed <em>before</em> the round starts, using the same public formula
-          real crash games use. Nothing here involves real money or a live server.
-        </p>
-        <div class="fairness-row"><span>Last seed</span><code id="fairSeed">—</code></div>
-        <div class="fairness-row"><span>Hash</span><code id="fairHash">—</code></div>
-        <div class="fairness-row"><span>Crash point</span><code id="fairCrash">—</code></div>
-      </div>
-    </div>
-  </div>
+  <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
