@@ -246,6 +246,47 @@
       : `<tr><td colspan="5" style="color:var(--text-dim);">No activity yet.</td></tr>`;
   }
 
+  async function loadRechargeRequests() {
+    const { requests } = await api("/recharge-requests");
+    const tbody = document.getElementById("rechargeTableBody");
+    tbody.innerHTML = requests.length
+      ? requests.map((r) => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${escapeHtml(r.username)}</td>
+            <td>${Number(r.amount).toFixed(2)}</td>
+            <td><span class="pill ${r.status === "pending" ? "warn" : r.status === "approved" ? "ok" : "bad"}">${escapeHtml(r.status)}</span></td>
+            <td>${new Date(r.created_at).toLocaleString()}</td>
+            <td class="row-actions">
+              ${r.status === "pending"
+                ? `<button class="mini-btn" data-action="recharge-approve" data-id="${r.id}">Approve</button>
+                   <button class="mini-btn danger" data-action="recharge-reject" data-id="${r.id}">Reject</button>`
+                : "—"}
+            </td>
+          </tr>`).join("")
+      : `<tr><td colspan="6" style="color:var(--text-dim);">No requests yet.</td></tr>`;
+  }
+
+  document.getElementById("rechargeTableBody").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button.mini-btn");
+    if (!btn) return;
+    const id = btn.dataset.id;
+    try {
+      if (btn.dataset.action === "recharge-approve") {
+        const note = prompt("Note for this approval (optional):", "") || "";
+        await api(`/recharge-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ note }) });
+        toast("Recharge approved.");
+      } else if (btn.dataset.action === "recharge-reject") {
+        const note = prompt("Reason for rejecting (optional):", "") || "";
+        await api(`/recharge-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) });
+        toast("Recharge rejected.");
+      }
+      await Promise.all([loadRechargeRequests(), loadUsers(), loadStats()]);
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -255,12 +296,13 @@
   (async () => {
     const isAdmin = await loadSelf();
     if (!isAdmin) return;
-    await Promise.all([loadStats(), loadSettings(), loadUsers(), loadRounds(), loadActivity(), loadLiveRound()]);
+    await Promise.all([loadStats(), loadSettings(), loadUsers(), loadRounds(), loadActivity(), loadLiveRound(), loadRechargeRequests()]);
     setInterval(() => {
       loadStats().catch(() => {});
       loadUsers().catch(() => {});
       loadRounds().catch(() => {});
       loadActivity().catch(() => {});
+      loadRechargeRequests().catch(() => {});
     }, 8000);
     setInterval(() => {
       loadLiveRound().catch(() => {});

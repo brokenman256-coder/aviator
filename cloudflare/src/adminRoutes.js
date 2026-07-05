@@ -157,4 +157,49 @@ admin.post("/round/force-crash", async (c) => {
   return c.json(await res.json());
 });
 
+// ---------- Recharge requests ----------
+
+admin.get("/recharge-requests", async (c) => {
+  const status = c.req.query("status"); // pending | approved | rejected | omitted for all
+  const query = status
+    ? c.env.DB.prepare(
+        `SELECT rr.*, u.username FROM recharge_requests rr JOIN users u ON u.id = rr.user_id
+         WHERE rr.status = ? ORDER BY rr.id DESC LIMIT 100`
+      ).bind(status)
+    : c.env.DB.prepare(
+        `SELECT rr.*, u.username FROM recharge_requests rr JOIN users u ON u.id = rr.user_id
+         ORDER BY rr.id DESC LIMIT 100`
+      );
+  const { results } = await query.all();
+  return c.json({ requests: results });
+});
+
+admin.post("/recharge-requests/:id/approve", async (c) => {
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json().catch(() => ({}));
+  const request = await c.env.DB.prepare("SELECT * FROM recharge_requests WHERE id = ?").bind(id).first();
+  if (!request) return c.json({ error: "Request not found" }, 404);
+  if (request.status !== "pending") return c.json({ error: `Request is already ${request.status}` }, 400);
+
+  // Mark resolved first, guarded on still being pending, so two concurrent
+  // approve/reject clicks can't both succeed against the same request.
+  const claim = await c.env.DB.prepare(
+    "UPDATE recharge_requests SET status = 'approved', admin_note = ?, resolved_by = ?, resolved_at = ? WHERE id = ? AND status = 'pending'"
+  ).bind(body.note || null, c.get("user").id, new Date().toISOString(), id).run();
+  if (!claim.meta.changes) return c.json({ error: "Request was already resolved" }, 400);
+
+  const balance = await adjustBalance(c.env.DB, request.user_id, request.amount, "recharge_approved", { requestId: id, note: body.note || null });
+  return c.json({ ok: true, balance });
+});
+
+admin.post("/recharge-requests/:id/reject", async (c) => {
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json().catch(() => ({}));
+  const claim = await c.env.DB.prepare(
+    "UPDATE recharge_requests SET status = 'rejected', admin_note = ?, resolved_by = ?, resolved_at = ? WHERE id = ? AND status = 'pending'"
+  ).bind(body.note || null, c.get("user").id, new Date().toISOString(), id).run();
+  if (!claim.meta.changes) return c.json({ error: "Request not found or already resolved" }, 400);
+  return c.json({ ok: true });
+});
+
 export default admin;

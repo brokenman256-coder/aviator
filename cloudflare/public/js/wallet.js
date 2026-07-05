@@ -21,7 +21,10 @@
     signup_bonus: "Signup bonus",
     admin_adjust: "Admin adjustment",
     referral_bonus: "Referral bonus",
+    recharge_approved: "Recharge approved",
   };
+
+  const STATUS_PILL = { pending: "warn", approved: "ok", rejected: "bad" };
 
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => ({
@@ -63,6 +66,47 @@
     }
   }
 
+  async function loadRechargeRequests() {
+    const res = await fetch("/api/wallet/recharge-requests", { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const { requests } = await res.json();
+    const tbody = document.getElementById("rechargeTableBody");
+    tbody.innerHTML = requests.length
+      ? requests.map((r) => `
+          <tr>
+            <td>${new Date(r.created_at).toLocaleString()}</td>
+            <td>${Number(r.amount).toFixed(2)}</td>
+            <td><span class="pill ${STATUS_PILL[r.status] || ""}">${escapeHtml(r.status)}</span></td>
+          </tr>`).join("")
+      : `<tr><td colspan="3" style="color:var(--text-dim);">No requests yet.</td></tr>`;
+  }
+
+  document.getElementById("submitRechargeBtn").addEventListener("click", async () => {
+    const errorBox = document.getElementById("rechargeError");
+    errorBox.classList.add("hidden");
+    const amountInput = document.getElementById("rechargeAmount");
+    const amount = Number(amountInput.value);
+    if (!isFinite(amount) || amount <= 0) {
+      errorBox.textContent = "Enter a valid amount";
+      errorBox.classList.remove("hidden");
+      return;
+    }
+    try {
+      const res = await fetch("/api/wallet/recharge-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      amountInput.value = "";
+      await loadRechargeRequests();
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.remove("hidden");
+    }
+  });
+
   document.getElementById("copyReferralBtn").addEventListener("click", async () => {
     const input = document.getElementById("referralLink");
     input.select();
@@ -79,4 +123,5 @@
   });
 
   load();
+  loadRechargeRequests();
 })();
