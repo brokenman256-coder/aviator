@@ -70,6 +70,7 @@
     document.getElementById("settingReferralBonus").value = s.referralBonusCredits;
     document.getElementById("settingMinBet").value = s.minBet;
     document.getElementById("settingMaxBet").value = s.maxBet;
+    document.getElementById("settingFeedbackTitle").value = s.feedbackSectionTitle;
   }
 
   document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
@@ -82,6 +83,7 @@
           referralBonusCredits: Number(document.getElementById("settingReferralBonus").value),
           minBet: Number(document.getElementById("settingMinBet").value),
           maxBet: Number(document.getElementById("settingMaxBet").value),
+          feedbackSectionTitle: document.getElementById("settingFeedbackTitle").value,
         }),
       });
       toast("Settings saved.");

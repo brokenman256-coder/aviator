@@ -3,6 +3,7 @@ import authRoutes from "./authRoutes.js";
 import adminRoutes from "./adminRoutes.js";
 import walletRoutes from "./walletRoutes.js";
 import feedbackRoutes from "./feedbackRoutes.js";
+import { getSetting } from "./store.js";
 
 export { GameRoom } from "./gameRoom.js";
 
@@ -22,6 +23,13 @@ app.get("/api/banner", async (c) => {
     title: row.title || "",
     message: row.message || "",
     imageDataUrl: row.image_data_url || null,
+  });
+});
+
+// Public — small set of player-facing text labels an admin can customize.
+app.get("/api/site-settings", async (c) => {
+  return c.json({
+    feedbackSectionTitle: await getSetting(c.env.DB, "feedback_section_title"),
   });
 });
 

@@ -4,6 +4,7 @@ const DEFAULTS = {
   min_bet: "10",
   max_bet: "10000",
   referral_bonus_credits: "500",
+  feedback_section_title: "Review & Feedback",
 };
 
 async function getSetting(db, key) {

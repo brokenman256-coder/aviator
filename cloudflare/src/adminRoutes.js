@@ -50,11 +50,12 @@ admin.get("/settings", async (c) => {
     referralBonusCredits: Number(await getSetting(c.env.DB, "referral_bonus_credits")),
     minBet: Number(await getSetting(c.env.DB, "min_bet")),
     maxBet: Number(await getSetting(c.env.DB, "max_bet")),
+    feedbackSectionTitle: await getSetting(c.env.DB, "feedback_section_title"),
   });
 });
 
 admin.post("/settings", async (c) => {
-  const { houseEdgePercent, signupBonusCredits, referralBonusCredits, minBet, maxBet } = await c.req.json().catch(() => ({}));
+  const { houseEdgePercent, signupBonusCredits, referralBonusCredits, minBet, maxBet, feedbackSectionTitle } = await c.req.json().catch(() => ({}));
   if (houseEdgePercent !== undefined) {
     await setSetting(c.env.DB, "house_edge_percent", Math.min(50, Math.max(0, Number(houseEdgePercent))));
   }
@@ -66,6 +67,10 @@ admin.post("/settings", async (c) => {
   }
   if (minBet !== undefined) await setSetting(c.env.DB, "min_bet", Math.max(1, Number(minBet)));
   if (maxBet !== undefined) await setSetting(c.env.DB, "max_bet", Math.max(1, Number(maxBet)));
+  if (feedbackSectionTitle !== undefined) {
+    const trimmed = String(feedbackSectionTitle).trim().slice(0, 80);
+    await setSetting(c.env.DB, "feedback_section_title", trimmed || "Review & Feedback");
+  }
   return c.json({ ok: true });
 });
 

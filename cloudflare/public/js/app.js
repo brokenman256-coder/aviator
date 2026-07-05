@@ -65,6 +65,20 @@
   }
   loadBanner();
 
+  // ---------- Site settings (admin-customizable player-facing text) ----------
+  async function loadSiteSettings() {
+    try {
+      const res = await fetch("/api/site-settings");
+      const s = await res.json();
+      if (s.feedbackSectionTitle) {
+        document.getElementById("feedbackSectionTitle").textContent = s.feedbackSectionTitle;
+      }
+    } catch {
+      // keep the default heading text if this fails
+    }
+  }
+  loadSiteSettings();
+
   // ---------- Toast ----------
   const toastEl = document.getElementById("toast");
   let toastTimer = null;
