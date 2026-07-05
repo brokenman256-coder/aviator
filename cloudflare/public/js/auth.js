@@ -1,8 +1,10 @@
 (() => {
   "use strict";
 
+  const wantsAdmin = new URLSearchParams(location.search).get("admin");
+
   if (localStorage.getItem("aviator_token")) {
-    window.location.href = "index.html";
+    window.location.href = wantsAdmin ? "admin.html" : "index.html";
     return;
   }
 
@@ -16,6 +18,11 @@
   const tabs = document.querySelectorAll(".auth-tab");
 
   let pendingUserId = null;
+
+  if (wantsAdmin) {
+    document.getElementById("loginEmail").value = "admin@aviator.local";
+    document.getElementById("loginPassword").focus();
+  }
 
   const referralCode = new URLSearchParams(location.search).get("ref");
   if (referralCode) {
@@ -66,7 +73,7 @@
   function onAuthSuccess(token, user) {
     localStorage.setItem("aviator_token", token);
     localStorage.setItem("aviator_user", JSON.stringify(user));
-    window.location.href = user.isAdmin ? "index.html" : "index.html";
+    window.location.href = wantsAdmin && user.isAdmin ? "admin.html" : "index.html";
   }
 
   function showOtpStep(userId, message, devCode) {
