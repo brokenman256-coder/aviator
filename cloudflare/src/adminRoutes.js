@@ -205,4 +205,44 @@ admin.post("/recharge-requests/:id/reject", async (c) => {
   return c.json({ ok: true });
 });
 
+// ---------- Site banner ----------
+const MAX_BANNER_IMAGE_CHARS = 1_500_000; // ~1.1MB image, generous for a small banner graphic
+
+admin.get("/banner", async (c) => {
+  const row = await c.env.DB.prepare("SELECT * FROM banner WHERE id = 1").first();
+  return c.json({
+    enabled: !!(row && row.enabled),
+    title: row?.title || "",
+    message: row?.message || "",
+    imageDataUrl: row?.image_data_url || null,
+  });
+});
+
+admin.post("/banner", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { title, message, imageDataUrl, enabled } = body;
+
+  if (imageDataUrl && imageDataUrl.length > MAX_BANNER_IMAGE_CHARS) {
+    return c.json({ error: "Image is too large — please use a smaller image" }, 400);
+  }
+  if (imageDataUrl && !/^data:image\/(png|jpeg|jpg|gif|webp);base64,/.test(imageDataUrl)) {
+    return c.json({ error: "Image must be a PNG, JPEG, GIF, or WebP" }, 400);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE banner SET title = ?, message = ?, image_data_url = COALESCE(?, image_data_url), enabled = ?, updated_at = ? WHERE id = 1`
+  )
+    .bind(title || null, message || null, imageDataUrl || null, enabled ? 1 : 0, new Date().toISOString())
+    .run();
+
+  return c.json({ ok: true });
+});
+
+admin.get("/feedback", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT f.*, u.username FROM feedback f JOIN users u ON u.id = f.user_id ORDER BY f.id DESC LIMIT 100`
+  ).all();
+  return c.json({ feedback: results });
+});
+
 export default admin;

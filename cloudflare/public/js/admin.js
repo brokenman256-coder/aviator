@@ -119,6 +119,7 @@
         <td>${u.id}</td>
         <td>${escapeHtml(u.username)}</td>
         <td>${escapeHtml(u.email)}</td>
+        <td>${escapeHtml(u.phone || "—")}</td>
         <td>${u.balance.toFixed(2)}</td>
         <td><span class="pill ${u.isVerified ? "ok" : "warn"}">${u.isVerified ? "Verified" : "Pending"}</span></td>
         <td><span class="pill ${u.isBanned ? "bad" : "ok"}">${u.isBanned ? "Banned" : "Active"}</span></td>
@@ -272,6 +273,20 @@
       : `<tr><td colspan="5" style="color:var(--text-dim);">No activity yet.</td></tr>`;
   }
 
+  async function loadFeedback() {
+    const { feedback } = await api("/feedback");
+    const tbody = document.getElementById("feedbackTableBody");
+    tbody.innerHTML = feedback.length
+      ? feedback.map((f) => `
+          <tr>
+            <td>${new Date(f.created_at).toLocaleString()}</td>
+            <td>${escapeHtml(f.username)}</td>
+            <td>${"★".repeat(f.rating)}${"☆".repeat(5 - f.rating)}</td>
+            <td>${escapeHtml(f.message || "—")}</td>
+          </tr>`).join("")
+      : `<tr><td colspan="4" style="color:var(--text-dim);">No feedback yet.</td></tr>`;
+  }
+
   function metaReasonHtml(t) {
     if (!t.meta) return "";
     try {
@@ -330,16 +345,73 @@
     }[c]));
   }
 
+  // ---------- Site banner ----------
+  let pendingBannerImageDataUrl = null;
+
+  async function loadBanner() {
+    const b = await api("/banner");
+    document.getElementById("bannerTitle").value = b.title || "";
+    document.getElementById("bannerMessage").value = b.message || "";
+    document.getElementById("bannerEnabled").checked = !!b.enabled;
+    const preview = document.getElementById("bannerPreview");
+    if (b.imageDataUrl) {
+      preview.src = b.imageDataUrl;
+      preview.style.display = "block";
+    } else {
+      preview.style.display = "none";
+    }
+  }
+
+  document.getElementById("bannerImageInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 1_100_000) {
+      toast("Image is too large — please pick a smaller file");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingBannerImageDataUrl = reader.result;
+      const preview = document.getElementById("bannerPreview");
+      preview.src = pendingBannerImageDataUrl;
+      preview.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById("saveBannerBtn").addEventListener("click", async () => {
+    const errorBox = document.getElementById("bannerError");
+    errorBox.classList.add("hidden");
+    try {
+      await api("/banner", {
+        method: "POST",
+        body: JSON.stringify({
+          title: document.getElementById("bannerTitle").value.trim(),
+          message: document.getElementById("bannerMessage").value.trim(),
+          imageDataUrl: pendingBannerImageDataUrl,
+          enabled: document.getElementById("bannerEnabled").checked,
+        }),
+      });
+      pendingBannerImageDataUrl = null;
+      toast("Banner saved.");
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.remove("hidden");
+    }
+  });
+
   (async () => {
     const isAdmin = await loadSelf();
     if (!isAdmin) return;
-    await Promise.all([loadStats(), loadSettings(), loadUsers(), loadRounds(), loadActivity(), loadLiveRound(), loadRechargeRequests()]);
+    await Promise.all([loadStats(), loadSettings(), loadUsers(), loadRounds(), loadActivity(), loadLiveRound(), loadRechargeRequests(), loadBanner(), loadFeedback()]);
     setInterval(() => {
       loadStats().catch(() => {});
       loadUsers().catch(() => {});
       loadRounds().catch(() => {});
       loadActivity().catch(() => {});
       loadRechargeRequests().catch(() => {});
+      loadFeedback().catch(() => {});
     }, 8000);
     setInterval(() => {
       loadLiveRound().catch(() => {});

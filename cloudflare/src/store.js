@@ -70,6 +70,7 @@ function publicUser(u) {
     id: u.id,
     username: u.username,
     email: u.email,
+    phone: u.phone || null,
     balance: u.balance,
     isAdmin: !!u.is_admin,
     isBanned: !!u.is_banned,

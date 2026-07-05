@@ -8,6 +8,11 @@ const auth = new Hono();
 const OTP_TTL_MS = 10 * 60 * 1000;
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^[0-9]{7,15}$/;
+
+function normalizePhone(phone) {
+  return String(phone || "").replace(/[^0-9]/g, "");
+}
 
 function issueToken(user, secret) {
   return signJwt({ uid: user.id }, secret, 7 * 24 * 60 * 60);
@@ -45,8 +50,9 @@ async function createAndSendOtp(db, userId, email) {
 auth.post("/register", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { username, email, password, referralCode } = body;
-  if (!username || !email || !password) {
-    return c.json({ error: "username, email, and password are required" }, 400);
+  const phone = normalizePhone(body.phone);
+  if (!username || !email || !password || !phone) {
+    return c.json({ error: "username, email, password, and phone number are required" }, 400);
   }
   if (!USERNAME_RE.test(username)) {
     return c.json({ error: "Username must be 3-20 characters (letters, numbers, underscore)" }, 400);
@@ -54,12 +60,17 @@ auth.post("/register", async (c) => {
   if (!EMAIL_RE.test(email)) {
     return c.json({ error: "Enter a valid email address" }, 400);
   }
+  if (!PHONE_RE.test(phone)) {
+    return c.json({ error: "Enter a valid phone number (digits only, 7-15 digits)" }, 400);
+  }
   if (password.length < 6) {
     return c.json({ error: "Password must be at least 6 characters" }, 400);
   }
 
-  const existing = await c.env.DB.prepare("SELECT id FROM users WHERE email = ? OR username = ?").bind(email, username).first();
-  if (existing) return c.json({ error: "Username or email already registered" }, 409);
+  const existing = await c.env.DB.prepare(
+    "SELECT id FROM users WHERE email = ? OR username = ? OR phone = ?"
+  ).bind(email, username, phone).first();
+  if (existing) return c.json({ error: "Username, email, or phone number is already registered" }, 409);
 
   let referredBy = null;
   if (referralCode) {
@@ -71,10 +82,10 @@ auth.post("/register", async (c) => {
   const newReferralCode = await generateUniqueReferralCode(c.env.DB);
   const now = new Date().toISOString();
   const info = await c.env.DB.prepare(
-    `INSERT INTO users (username, email, password_hash, password_salt, is_verified, is_admin, is_banned, balance, created_at, referral_code, referred_by)
-     VALUES (?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?)`
+    `INSERT INTO users (username, email, phone, password_hash, password_salt, is_verified, is_admin, is_banned, balance, created_at, referral_code, referred_by)
+     VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?)`
   )
-    .bind(username, email, hash, salt, now, newReferralCode, referredBy)
+    .bind(username, email, phone, hash, salt, now, newReferralCode, referredBy)
     .run();
 
   const userId = info.meta.last_row_id;

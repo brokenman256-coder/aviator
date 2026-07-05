@@ -108,9 +108,10 @@
     clearError();
     const username = document.getElementById("registerUsername").value.trim();
     const email = document.getElementById("registerEmail").value.trim();
+    const phone = document.getElementById("registerPhone").value.trim();
     const password = document.getElementById("registerPassword").value;
     try {
-      const data = await api("/register", { username, email, password, referralCode });
+      const data = await api("/register", { username, email, phone, password, referralCode });
       showOtpStep(data.userId, data.message, data.devCode);
     } catch (err) {
       showError(err.message);

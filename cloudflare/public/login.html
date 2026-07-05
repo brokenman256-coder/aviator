@@ -44,6 +44,10 @@
           <input type="email" id="registerEmail" required autocomplete="email" />
         </div>
         <div class="field" style="margin-top:10px;">
+          <label>Phone number</label>
+          <input type="tel" id="registerPhone" required pattern="[0-9]{7,15}" autocomplete="tel" placeholder="Digits only" />
+        </div>
+        <div class="field" style="margin-top:10px;">
           <label>Password</label>
           <input type="password" id="registerPassword" required minlength="6" autocomplete="new-password" />
         </div>
