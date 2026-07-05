@@ -38,6 +38,25 @@ export class GameRoom extends DurableObject {
 
   async fetch(request) {
     const url = new URL(request.url);
+
+    // These paths are only ever reached via the Worker's already-admin-gated
+    // routes (server.js calls stub.fetch() directly) — not exposed to the
+    // internet, so no separate auth check is needed here.
+    if (url.pathname === "/admin/state") {
+      await this.ensureStarted();
+      return Response.json({ ...this.publicState(), crashPoint: this.round ? this.round.crashPoint : null });
+    }
+    if (url.pathname === "/admin/force-crash" && request.method === "POST") {
+      await this.ensureStarted();
+      if (this.phase === "waiting") {
+        this.beginRunning();
+      }
+      if (this.phase === "running") {
+        await this.beginCrashed();
+      }
+      return Response.json({ ok: true, phase: this.phase });
+    }
+
     if (url.pathname !== "/ws") return new Response("Not found", { status: 404 });
 
     const token = url.searchParams.get("token");
@@ -61,16 +80,16 @@ export class GameRoom extends DurableObject {
     server.addEventListener("close", () => this.sessions.delete(server));
     server.addEventListener("error", () => this.sessions.delete(server));
 
-    this.ensureStarted();
+    await this.ensureStarted();
     this.sendTo(server, { type: "round:state", ...this.publicState() });
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  ensureStarted() {
+  async ensureStarted() {
     if (this.started) return;
     this.started = true;
-    this.beginWaiting();
+    await this.beginWaiting();
     this.timer = setInterval(() => this.tick(), TICK_MS);
   }
 

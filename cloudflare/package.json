@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:migrate:local": "wrangler d1 execute aviator-db --local --file=./migrations/0001_init.sql",
-    "db:migrate:remote": "wrangler d1 execute aviator-db --remote --file=./migrations/0001_init.sql"
+    "db:migrate:local": "wrangler d1 execute aviator-db --local --file=./migrations/0001_init.sql && wrangler d1 execute aviator-db --local --file=./migrations/0002_referrals.sql",
+    "db:migrate:remote": "wrangler d1 execute aviator-db --remote --file=./migrations/0001_init.sql && wrangler d1 execute aviator-db --remote --file=./migrations/0002_referrals.sql"
   },
   "dependencies": {
     "hono": "^4.6.14"

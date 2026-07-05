@@ -32,6 +32,19 @@
       </div>
 
       <div class="panel">
+        <h2>Live Round <span style="color:var(--text-dim); font-size:11px; text-transform:none; font-family:inherit;">(admin-only — not visible to players)</span></h2>
+        <div class="admin-grid">
+          <div class="stat-card"><div class="stat-label">Phase</div><div class="stat-value" id="liveState" style="font-size:16px;">—</div></div>
+          <div class="stat-card"><div class="stat-label">Current Multiplier</div><div class="stat-value" id="liveMultiplier">—</div></div>
+          <div class="stat-card"><div class="stat-label">This Round's Crash Point</div><div class="stat-value" id="liveCrashPoint" style="color:var(--red-bright);">—</div></div>
+        </div>
+        <div style="font-size:11px; color:var(--text-dim);">
+          Heads up: if you also play in the same rounds as your players, using this to time your own bets/cash-outs is cheating them.
+        </div>
+        <button id="forceCrashBtn" class="ghost-btn" style="width:fit-content;">Force End Round</button>
+      </div>
+
+      <div class="panel">
         <h2>Game Settings</h2>
         <div class="settings-grid">
           <div class="field">
@@ -41,6 +54,10 @@
           <div class="field">
             <label>Signup bonus (credits)</label>
             <input type="number" id="settingBonus" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Referral bonus (credits, each side)</label>
+            <input type="number" id="settingReferralBonus" min="0" step="1" />
           </div>
           <div class="field">
             <label>Min bet</label>
@@ -78,6 +95,48 @@
             </thead>
             <tbody id="roundsTableBody"></tbody>
           </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Activity Log</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Time</th><th>User</th><th>Type</th><th>Amount</th><th>Balance After</th></tr>
+            </thead>
+            <tbody id="activityTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="userModal" class="modal hidden">
+    <div class="modal-card" style="max-width:640px;">
+      <div class="modal-header">
+        <span id="userModalTitle">User</span>
+        <button id="closeUserModal" class="ghost-btn">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+        <div id="userModalReferrals" style="font-size:12px; color:var(--text-dim);"></div>
+        <div>
+          <div style="font-weight:700; margin-bottom:6px; font-size:13px;">Recent Bets</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Round</th><th>Slot</th><th>Amount</th><th>Status</th><th>Cashout</th><th>Payout</th></tr></thead>
+              <tbody id="userModalBets"></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:700; margin-bottom:6px; font-size:13px;">Recent Transactions</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Time</th><th>Type</th><th>Amount</th><th>Balance After</th></tr></thead>
+              <tbody id="userModalTx"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

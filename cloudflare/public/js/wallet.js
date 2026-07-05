@@ -20,6 +20,7 @@
     payout: "Cash out",
     signup_bonus: "Signup bonus",
     admin_adjust: "Admin adjustment",
+    referral_bonus: "Referral bonus",
   };
 
   function escapeHtml(str) {
@@ -35,6 +36,9 @@
 
     document.getElementById("usernamePill").textContent = user.username;
     document.getElementById("walletBalance").textContent = Number(user.balance).toFixed(2);
+    if (user.referralCode) {
+      document.getElementById("referralLink").value = `${location.origin}/login.html?ref=${user.referralCode}`;
+    }
 
     const tbody = document.getElementById("txTableBody");
     tbody.innerHTML = "";
@@ -58,6 +62,21 @@
       tbody.appendChild(tr);
     }
   }
+
+  document.getElementById("copyReferralBtn").addEventListener("click", async () => {
+    const input = document.getElementById("referralLink");
+    input.select();
+    try {
+      await navigator.clipboard.writeText(input.value);
+      const btn = document.getElementById("copyReferralBtn");
+      const original = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => (btn.textContent = original), 1500);
+    } catch {
+      // clipboard API unavailable (e.g. insecure context) — the field is
+      // selected above so the user can still copy manually with Ctrl/Cmd+C.
+    }
+  });
 
   load();
 })();
