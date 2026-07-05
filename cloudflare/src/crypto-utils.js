@@ -1,7 +1,9 @@
 // Workers runtime has no Node `crypto` module — everything here uses the
 // standard Web Crypto API (SubtleCrypto), which is what's actually available.
 
-const PBKDF2_ITERATIONS = 210000;
+// Cloudflare Workers' PBKDF2 implementation caps out at 100,000 iterations
+// (NotSupportedError above that), unlike Node or browsers.
+const PBKDF2_ITERATIONS = 100000;
 
 function toHex(buffer) {
   return Array.from(new Uint8Array(buffer))

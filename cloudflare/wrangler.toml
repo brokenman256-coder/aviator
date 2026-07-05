@@ -2,6 +2,7 @@ name = "aviator"
 main = "src/index.js"
 compatibility_date = "2026-01-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 
 [assets]
 directory = "./public"
@@ -12,9 +13,9 @@ class_name = "GameRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["GameRoom"]
+new_sqlite_classes = ["GameRoom"]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "aviator-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "1029ac4d-8802-4a9e-8e96-395bc60089c8"
