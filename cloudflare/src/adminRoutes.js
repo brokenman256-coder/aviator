@@ -14,9 +14,12 @@ admin.post("/users/:id/adjust", async (c) => {
   const userId = Number(c.req.param("id"));
   const body = await c.req.json().catch(() => ({}));
   const delta = Number(body.amount);
-  const reason = body.reason || null;
+  const reason = (body.reason || "").trim();
   if (!isFinite(delta) || delta === 0) {
     return c.json({ error: "amount must be a non-zero number" }, 400);
+  }
+  if (!reason) {
+    return c.json({ error: "A reason is required for balance adjustments" }, 400);
   }
   try {
     const balance = await adjustBalance(c.env.DB, userId, delta, "admin_adjust", { reason, adminId: c.get("user").id });

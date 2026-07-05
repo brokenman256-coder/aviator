@@ -122,14 +122,20 @@
     currentMultiplier: 1,
   };
 
+  const roundBadgeEl = document.getElementById("roundBadge");
+  function updateRoundBadge(roundId) {
+    if (roundId) roundBadgeEl.textContent = `Round #${roundId}`;
+  }
+
   socket.on("round:state", (state) => {
     game.phase = state.state;
     game.phaseStartLocal = performance.now() - state.msInPhase;
     game.waitMs = state.waitMs;
     game.currentMultiplier = state.multiplier;
+    updateRoundBadge(state.roundId);
   });
 
-  socket.on("round:waiting", ({ waitMs }) => {
+  socket.on("round:waiting", ({ waitMs, roundId }) => {
     game.phase = "waiting";
     game.phaseStartLocal = performance.now();
     game.waitMs = waitMs;
@@ -139,16 +145,18 @@
     multiplierTextEl.classList.remove("flying", "crashed");
     multiplierTextEl.textContent = "1.00x";
     ringEl.classList.remove("hidden");
+    updateRoundBadge(roundId);
     betPanels.forEach((p) => p.onRoundReset());
   });
 
-  socket.on("round:running", () => {
+  socket.on("round:running", ({ roundId }) => {
     game.phase = "running";
     game.phaseStartLocal = performance.now();
     game.lastTick = null;
     ringEl.classList.add("hidden");
     multiplierTextEl.classList.add("flying");
     stateTextEl.textContent = "Flying…";
+    updateRoundBadge(roundId);
     betPanels.forEach((p) => p.onRoundStart());
   });
 
@@ -156,7 +164,7 @@
     game.lastTick = { multiplier, elapsedMs, receivedAt: performance.now() };
   });
 
-  socket.on("round:crashed", ({ crashPoint }) => {
+  socket.on("round:crashed", ({ crashPoint, roundId }) => {
     game.phase = "crashed";
     game.phaseStartLocal = performance.now();
     game.crashPoint = crashPoint;
@@ -165,6 +173,7 @@
     multiplierTextEl.classList.add("crashed");
     multiplierTextEl.textContent = crashPoint.toFixed(2) + "x";
     stateTextEl.textContent = "Flew away!";
+    updateRoundBadge(roundId);
     pushHistory(crashPoint);
     betPanels.forEach((p) => p.onRoundEnd());
   });

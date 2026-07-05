@@ -166,6 +166,21 @@ a { color: var(--gold); }
   overflow: hidden;
 }
 
+.round-badge {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  z-index: 2;
+}
+
 #canvas {
   width: 100%;
   height: 100%;
@@ -444,6 +459,20 @@ a { color: var(--gold); }
 }
 
 .field input:focus { outline: none; border-color: var(--gold); }
+
+.field-textarea {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.field-textarea:focus { outline: none; border-color: var(--gold); }
 
 .primary-btn {
   background: linear-gradient(180deg, var(--gold-bright), var(--gold));

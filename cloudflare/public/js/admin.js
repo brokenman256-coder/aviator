@@ -93,6 +93,7 @@
   // ---------- Live round ----------
   async function loadLiveRound() {
     const s = await api("/live-round");
+    document.getElementById("liveRoundId").textContent = s.roundId ? `#${s.roundId}` : "—";
     document.getElementById("liveState").textContent = s.state;
     document.getElementById("liveMultiplier").textContent = Number(s.multiplier).toFixed(2) + "x";
     document.getElementById("liveCrashPoint").textContent = s.crashPoint ? Number(s.crashPoint).toFixed(2) + "x" : "—";
@@ -123,9 +124,7 @@
         <td><span class="pill ${u.isBanned ? "bad" : "ok"}">${u.isBanned ? "Banned" : "Active"}</span></td>
         <td><span class="pill ${u.isAdmin ? "warn" : ""}">${u.isAdmin ? "Admin" : "Player"}</span></td>
         <td class="row-actions">
-          <button class="mini-btn" data-action="view" data-id="${u.id}">View</button>
-          <button class="mini-btn" data-action="credit" data-id="${u.id}">+ Credit</button>
-          <button class="mini-btn" data-action="debit" data-id="${u.id}">− Debit</button>
+          <button class="mini-btn" data-action="view" data-id="${u.id}">View / Adjust Balance</button>
           <button class="mini-btn danger" data-action="ban" data-id="${u.id}" data-banned="${u.isBanned}">${u.isBanned ? "Unban" : "Ban"}</button>
           <button class="mini-btn" data-action="admin" data-id="${u.id}" data-isadmin="${u.isAdmin}">${u.isAdmin ? "Revoke Admin" : "Make Admin"}</button>
           <button class="mini-btn danger" data-action="delete" data-id="${u.id}" data-username="${escapeHtml(u.username)}">Delete</button>
@@ -145,16 +144,6 @@
       if (action === "view") {
         await openUserModal(id);
         return;
-      } else if (action === "credit" || action === "debit") {
-        const amountStr = prompt(`Amount of credits to ${action === "credit" ? "add" : "remove"}:`, "100");
-        if (!amountStr) return;
-        const amount = Number(amountStr);
-        if (!isFinite(amount) || amount <= 0) return toast("Enter a positive number");
-        const reason = prompt("Reason (optional):", "") || "";
-        await api(`/users/${id}/adjust`, {
-          method: "POST",
-          body: JSON.stringify({ amount: action === "credit" ? amount : -amount, reason }),
-        });
       } else if (action === "ban") {
         const nextBanned = btn.dataset.banned !== "true";
         await api(`/users/${id}/ban`, { method: "POST", body: JSON.stringify({ banned: nextBanned }) });
@@ -176,9 +165,46 @@
   document.getElementById("closeUserModal").addEventListener("click", () => userModal.classList.add("hidden"));
   userModal.addEventListener("click", (e) => { if (e.target === userModal) userModal.classList.add("hidden"); });
 
+  let currentModalUserId = null;
+
+  async function submitAdjustment(sign) {
+    const errorBox = document.getElementById("adjustError");
+    errorBox.classList.add("hidden");
+    const amount = Number(document.getElementById("adjustAmount").value);
+    const reason = document.getElementById("adjustReason").value.trim();
+    if (!isFinite(amount) || amount <= 0) {
+      errorBox.textContent = "Enter a positive amount";
+      errorBox.classList.remove("hidden");
+      return;
+    }
+    if (!reason) {
+      errorBox.textContent = "Reason is required";
+      errorBox.classList.remove("hidden");
+      return;
+    }
+    try {
+      await api(`/users/${currentModalUserId}/adjust`, {
+        method: "POST",
+        body: JSON.stringify({ amount: sign * amount, reason }),
+      });
+      toast(sign > 0 ? "Credited." : "Debited.");
+      await Promise.all([openUserModal(currentModalUserId), loadUsers(), loadStats()]);
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.remove("hidden");
+    }
+  }
+
+  document.getElementById("adjustCreditBtn").addEventListener("click", () => submitAdjustment(1));
+  document.getElementById("adjustDebitBtn").addEventListener("click", () => submitAdjustment(-1));
+
   async function openUserModal(id) {
     const data = await api(`/users/${id}`);
+    currentModalUserId = data.user.id;
     document.getElementById("userModalTitle").textContent = `${data.user.username} (#${data.user.id})`;
+    document.getElementById("adjustAmount").value = "";
+    document.getElementById("adjustReason").value = "";
+    document.getElementById("adjustError").classList.add("hidden");
 
     const refBox = document.getElementById("userModalReferrals");
     const parts = [];
@@ -206,7 +232,7 @@
       ? data.transactions.map((t) => `
           <tr>
             <td>${new Date(t.created_at).toLocaleString()}</td>
-            <td>${escapeHtml(t.type)}</td>
+            <td>${escapeHtml(t.type)}${metaReasonHtml(t)}</td>
             <td class="tx-amount ${t.amount >= 0 ? "positive" : "negative"}">${t.amount >= 0 ? "+" : ""}${t.amount.toFixed(2)}</td>
             <td>${t.balance_after.toFixed(2)}</td>
           </tr>`).join("")
@@ -239,11 +265,22 @@
           <tr>
             <td>${new Date(t.created_at).toLocaleString()}</td>
             <td>${escapeHtml(t.username)}</td>
-            <td>${escapeHtml(t.type)}</td>
+            <td>${escapeHtml(t.type)}${metaReasonHtml(t)}</td>
             <td class="tx-amount ${t.amount >= 0 ? "positive" : "negative"}">${t.amount >= 0 ? "+" : ""}${t.amount.toFixed(2)}</td>
             <td>${t.balance_after.toFixed(2)}</td>
           </tr>`).join("")
       : `<tr><td colspan="5" style="color:var(--text-dim);">No activity yet.</td></tr>`;
+  }
+
+  function metaReasonHtml(t) {
+    if (!t.meta) return "";
+    try {
+      const meta = JSON.parse(t.meta);
+      if (meta.reason) return `<div style="font-size:11px; color:var(--text-dim); font-style:italic;">${escapeHtml(meta.reason)}</div>`;
+    } catch {
+      // meta wasn't JSON or had no reason field — nothing to show
+    }
+    return "";
   }
 
   async function loadRechargeRequests() {
