@@ -191,8 +191,23 @@ admin.post("/recharge-requests/:id/approve", async (c) => {
   ).bind(body.note || null, c.get("user").id, new Date().toISOString(), id).run();
   if (!claim.meta.changes) return c.json({ error: "Request was already resolved" }, 400);
 
-  const balance = await adjustBalance(c.env.DB, request.user_id, request.amount, "recharge_approved", { requestId: id, note: body.note || null });
-  return c.json({ ok: true, balance });
+  const isWithdrawal = request.type === "withdrawal";
+  const delta = isWithdrawal ? -request.amount : request.amount;
+  const txType = isWithdrawal ? "withdrawal_approved" : "recharge_approved";
+
+  try {
+    const balance = await adjustBalance(c.env.DB, request.user_id, delta, txType, { requestId: id, note: body.note || null });
+    return c.json({ ok: true, balance });
+  } catch (err) {
+    // The balance couldn't actually be adjusted (e.g. a withdrawal request
+    // whose balance has since dropped below the requested amount) — put the
+    // request back to pending rather than leaving it "approved" with no
+    // matching ledger entry.
+    await c.env.DB.prepare(
+      "UPDATE recharge_requests SET status = 'pending', admin_note = NULL, resolved_by = NULL, resolved_at = NULL WHERE id = ?"
+    ).bind(id).run();
+    return c.json({ error: err.message }, 400);
+  }
 });
 
 admin.post("/recharge-requests/:id/reject", async (c) => {

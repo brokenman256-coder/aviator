@@ -22,6 +22,7 @@
     admin_adjust: "Admin adjustment",
     referral_bonus: "Referral bonus",
     recharge_approved: "Recharge approved",
+    withdrawal_approved: "Withdrawal approved",
   };
 
   const STATUS_PILL = { pending: "warn", approved: "ok", rejected: "bad" };
@@ -75,16 +76,17 @@
       ? requests.map((r) => `
           <tr>
             <td>${new Date(r.created_at).toLocaleString()}</td>
+            <td>${r.type === "withdrawal" ? "Withdrawal" : "Recharge"}</td>
             <td>${Number(r.amount).toFixed(2)}</td>
             <td><span class="pill ${STATUS_PILL[r.status] || ""}">${escapeHtml(r.status)}</span></td>
           </tr>`).join("")
-      : `<tr><td colspan="3" style="color:var(--text-dim);">No requests yet.</td></tr>`;
+      : `<tr><td colspan="4" style="color:var(--text-dim);">No requests yet.</td></tr>`;
   }
 
-  document.getElementById("submitRechargeBtn").addEventListener("click", async () => {
-    const errorBox = document.getElementById("rechargeError");
+  async function submitFundRequest(type, amountInputId, errorBoxId) {
+    const errorBox = document.getElementById(errorBoxId);
     errorBox.classList.add("hidden");
-    const amountInput = document.getElementById("rechargeAmount");
+    const amountInput = document.getElementById(amountInputId);
     const amount = Number(amountInput.value);
     if (!isFinite(amount) || amount <= 0) {
       errorBox.textContent = "Enter a valid amount";
@@ -95,7 +97,7 @@
       const res = await fetch("/api/wallet/recharge-request", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount, type }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
@@ -105,6 +107,14 @@
       errorBox.textContent = err.message;
       errorBox.classList.remove("hidden");
     }
+  }
+
+  document.getElementById("submitRechargeBtn").addEventListener("click", () => {
+    submitFundRequest("recharge", "rechargeAmount", "rechargeError");
+  });
+
+  document.getElementById("submitWithdrawBtn").addEventListener("click", () => {
+    submitFundRequest("withdrawal", "withdrawAmount", "withdrawError");
   });
 
   document.getElementById("copyReferralBtn").addEventListener("click", async () => {

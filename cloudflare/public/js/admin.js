@@ -306,6 +306,7 @@
           <tr>
             <td>${r.id}</td>
             <td>${escapeHtml(r.username)}</td>
+            <td><span class="pill ${r.type === "withdrawal" ? "bad" : "ok"}">${r.type === "withdrawal" ? "Withdrawal" : "Recharge"}</span></td>
             <td>${Number(r.amount).toFixed(2)}</td>
             <td><span class="pill ${r.status === "pending" ? "warn" : r.status === "approved" ? "ok" : "bad"}">${escapeHtml(r.status)}</span></td>
             <td>${new Date(r.created_at).toLocaleString()}</td>
@@ -316,7 +317,7 @@
                 : "—"}
             </td>
           </tr>`).join("")
-      : `<tr><td colspan="6" style="color:var(--text-dim);">No requests yet.</td></tr>`;
+      : `<tr><td colspan="7" style="color:var(--text-dim);">No requests yet.</td></tr>`;
   }
 
   document.getElementById("rechargeTableBody").addEventListener("click", async (e) => {
