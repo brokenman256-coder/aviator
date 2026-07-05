@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aviator — Wallet</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon"><svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M2 12L22 2L14 22L11 13L2 12Z"/></svg></span>
+        <span class="brand-name">WALLET</span>
+      </div>
+      <div class="topbar-right">
+        <span id="usernamePill" class="username-pill"></span>
+        <a class="ghost-btn" href="index.html">Back to game</a>
+        <button id="logoutBtn" class="ghost-btn">Log out</button>
+      </div>
+    </header>
+
+    <div class="panel">
+      <h2>Balance</h2>
+      <div class="wallet-summary">
+        <div class="wallet-balance-value" id="walletBalance">0.00</div>
+        <span class="ghost-btn" style="cursor:default;">Credits</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Recent Activity</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Type</th><th>Amount</th><th>Balance After</th></tr>
+          </thead>
+          <tbody id="txTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/wallet.js"></script>
+</body>
+</html>

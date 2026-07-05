@@ -377,29 +377,31 @@
     ctx.lineTo(toX(0), h - padding);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, crashed ? "rgba(255,59,92,0.35)" : "rgba(79,124,255,0.35)");
+    grad.addColorStop(0, crashed ? "rgba(179,34,31,0.35)" : "rgba(212,175,55,0.28)");
     grad.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = grad;
     ctx.fill();
 
     ctx.beginPath();
     points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-    ctx.strokeStyle = crashed ? "#ff3b5c" : "#ffffff";
+    ctx.strokeStyle = crashed ? "#e2453f" : "#f0cc6b";
     ctx.lineWidth = 3;
     ctx.lineJoin = "round";
     ctx.stroke();
 
+    // Vector plane (dart silhouette), oriented along the direction of travel.
+    const PLANE_PATH = new Path2D("M14 0 L2 -4 L-10 -2 L-6 0 L-10 2 L2 4 Z");
     const [px, py] = points[points.length - 1];
     ctx.save();
     ctx.translate(px, py);
     const prev = points[Math.max(0, points.length - 5)];
     const angle = Math.atan2(py - prev[1], px - prev[0]);
     ctx.rotate(angle);
-    ctx.font = "22px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = crashed ? "#ff3b5c" : "#ffffff";
-    ctx.fillText("✈", 0, 0);
+    ctx.scale(1.15, 1.15);
+    ctx.fillStyle = crashed ? "#e2453f" : "#f0cc6b";
+    ctx.shadowColor = crashed ? "rgba(226,69,63,0.6)" : "rgba(240,204,107,0.6)";
+    ctx.shadowBlur = 8;
+    ctx.fill(PLANE_PATH);
     ctx.restore();
   }
 
