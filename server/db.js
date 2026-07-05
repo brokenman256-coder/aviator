@@ -2,7 +2,10 @@ const { DatabaseSync } = require("node:sqlite");
 const path = require("path");
 const fs = require("fs");
 
-const dataDir = path.join(__dirname, "..", "data");
+// DATA_DIR lets a deployment point this at a mounted persistent volume
+// (e.g. Railway), so the database survives redeploys instead of living on
+// the container's ephemeral filesystem.
+const dataDir = process.env.DATA_DIR || path.join(__dirname, "..", "data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const db = new DatabaseSync(path.join(dataDir, "aviator.db"));
