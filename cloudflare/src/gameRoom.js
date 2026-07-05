@@ -192,7 +192,7 @@ export class GameRoom extends DurableObject {
     this.currentMultiplier = this.round.crashPoint;
 
     for (const bet of this.activeBets.values()) {
-      if (!bet.cashedOut) {
+      if (!bet.cashedOut && !bet.reserved) {
         await this.env.DB.prepare("UPDATE bets SET status = 'lost', payout = 0 WHERE id = ?").bind(bet.betId).run();
       }
     }
@@ -222,7 +222,7 @@ export class GameRoom extends DurableObject {
 
   async checkAutoCashouts(multiplier) {
     for (const bet of this.activeBets.values()) {
-      if (!bet.cashedOut && bet.autoCashout && multiplier >= bet.autoCashout) {
+      if (!bet.cashedOut && !bet.reserved && bet.autoCashout && multiplier >= bet.autoCashout) {
         await this.settleCashOut(bet, multiplier);
       }
     }
@@ -233,49 +233,79 @@ export class GameRoom extends DurableObject {
     const key = betKey(userId, slot);
     if (this.activeBets.has(key)) throw new Error("You already have a bet in this slot");
 
-    amount = Math.round(Number(amount) * 100) / 100;
-    const minBet = await getNumberSetting(this.env.DB, "min_bet");
-    const maxBet = await getNumberSetting(this.env.DB, "max_bet");
-    if (!isFinite(amount) || amount < minBet || amount > maxBet) {
-      throw new Error(`Bet must be between ${minBet} and ${maxBet} credits`);
+    // Reserve the slot synchronously, before any `await`, so a duplicate
+    // request for the same slot (double-click, retried message) can't also
+    // pass the check above while this one is still in flight — closes the
+    // race window a plain async check-then-act would leave open.
+    this.activeBets.set(key, { betId: null, userId, slot, amount, autoCashout, cashedOut: false, reserved: true });
+
+    try {
+      amount = Math.round(Number(amount) * 100) / 100;
+      const minBet = await getNumberSetting(this.env.DB, "min_bet");
+      const maxBet = await getNumberSetting(this.env.DB, "max_bet");
+      if (!isFinite(amount) || amount < minBet || amount > maxBet) {
+        throw new Error(`Bet must be between ${minBet} and ${maxBet} credits`);
+      }
+      if (autoCashout !== null && autoCashout !== undefined) {
+        autoCashout = Number(autoCashout);
+        if (!isFinite(autoCashout) || autoCashout < 1.01) throw new Error("Auto cash-out target must be at least 1.01x");
+      } else {
+        autoCashout = null;
+      }
+
+      // Insert the bet row before touching the balance: if this fails (e.g.
+      // the DB-level unique constraint catches a duplicate that somehow got
+      // past the in-memory reservation above), nothing has been charged yet.
+      const now = new Date().toISOString();
+      let info;
+      try {
+        info = await this.env.DB.prepare(
+          `INSERT INTO bets (round_id, user_id, slot, amount, auto_cashout, status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'active', ?)`
+        )
+          .bind(this.round.id, userId, slot, amount, autoCashout, now)
+          .run();
+      } catch {
+        throw new Error("You already have a bet in this slot");
+      }
+
+      let newBalance;
+      try {
+        newBalance = await adjustBalance(this.env.DB, userId, -amount, "bet", { roundId: this.round.id, slot });
+      } catch (balanceErr) {
+        // Balance check failed (e.g. insufficient funds) — undo the bet row
+        // we just inserted so there's no orphaned "active" bet with no charge.
+        await this.env.DB.prepare("UPDATE bets SET status = 'cancelled' WHERE id = ?").bind(info.meta.last_row_id).run();
+        throw balanceErr;
+      }
+
+      this.activeBets.set(key, {
+        betId: info.meta.last_row_id,
+        userId,
+        slot,
+        amount,
+        autoCashout,
+        cashedOut: false,
+      });
+
+      return { slot, balance: newBalance, betId: info.meta.last_row_id };
+    } catch (err) {
+      this.activeBets.delete(key);
+      throw err;
     }
-    if (autoCashout !== null && autoCashout !== undefined) {
-      autoCashout = Number(autoCashout);
-      if (!isFinite(autoCashout) || autoCashout < 1.01) throw new Error("Auto cash-out target must be at least 1.01x");
-    } else {
-      autoCashout = null;
-    }
-
-    const newBalance = await adjustBalance(this.env.DB, userId, -amount, "bet", { roundId: this.round.id, slot });
-    const now = new Date().toISOString();
-    const info = await this.env.DB.prepare(
-      `INSERT INTO bets (round_id, user_id, slot, amount, auto_cashout, status, created_at)
-       VALUES (?, ?, ?, ?, ?, 'active', ?)`
-    )
-      .bind(this.round.id, userId, slot, amount, autoCashout, now)
-      .run();
-
-    this.activeBets.set(key, {
-      betId: info.meta.last_row_id,
-      userId,
-      slot,
-      amount,
-      autoCashout,
-      cashedOut: false,
-    });
-
-    return { slot, balance: newBalance, betId: info.meta.last_row_id };
   }
 
   async cancelBet(userId, slot) {
     if (this.phase !== "waiting") throw new Error("Cannot cancel after betting has closed");
     const key = betKey(userId, slot);
     const bet = this.activeBets.get(key);
-    if (!bet) throw new Error("No active bet to cancel");
+    if (!bet || bet.reserved) throw new Error("No active bet to cancel");
+    // Remove synchronously (before the refund's await) so a duplicate cancel
+    // request can't also see the bet as present and refund it twice.
+    this.activeBets.delete(key);
 
     const newBalance = await adjustBalance(this.env.DB, userId, bet.amount, "bet_cancel", { roundId: this.round.id, slot });
     await this.env.DB.prepare("UPDATE bets SET status = 'cancelled' WHERE id = ?").bind(bet.betId).run();
-    this.activeBets.delete(key);
     return { slot, balance: newBalance };
   }
 
@@ -283,7 +313,7 @@ export class GameRoom extends DurableObject {
     if (this.phase !== "running") throw new Error("No round in progress");
     const key = betKey(userId, slot);
     const bet = this.activeBets.get(key);
-    if (!bet || bet.cashedOut) throw new Error("No active bet to cash out");
+    if (!bet || bet.cashedOut || bet.reserved) throw new Error("No active bet to cash out");
 
     const elapsed = Date.now() - this.phaseStart;
     const multiplier = Math.min(multiplierAt(elapsed), this.round.crashPoint);

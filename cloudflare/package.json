@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:migrate:local": "wrangler d1 execute aviator-db --local --file=./migrations/0001_init.sql && wrangler d1 execute aviator-db --local --file=./migrations/0002_referrals.sql",
-    "db:migrate:remote": "wrangler d1 execute aviator-db --remote --file=./migrations/0001_init.sql && wrangler d1 execute aviator-db --remote --file=./migrations/0002_referrals.sql"
+    "db:migrate:local": "wrangler d1 execute aviator-db --local --file=./migrations/0001_init.sql && wrangler d1 execute aviator-db --local --file=./migrations/0002_referrals.sql && wrangler d1 execute aviator-db --local --file=./migrations/0003_bet_uniqueness.sql",
+    "db:migrate:remote": "wrangler d1 execute aviator-db --remote --file=./migrations/0001_init.sql && wrangler d1 execute aviator-db --remote --file=./migrations/0002_referrals.sql && wrangler d1 execute aviator-db --remote --file=./migrations/0003_bet_uniqueness.sql"
   },
   "dependencies": {
     "hono": "^4.6.14"

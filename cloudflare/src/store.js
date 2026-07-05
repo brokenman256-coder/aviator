@@ -37,14 +37,32 @@ async function logWalletTx(db, userId, type, amount, balanceAfter, meta) {
 
 // Applies a signed credit delta to a user's balance and records the ledger entry.
 // Throws if the user doesn't exist or the adjustment would take them negative.
+//
+// The check-and-update is a single atomic SQL statement (not a separate
+// read followed by a write), so two concurrent calls for the same user can't
+// both read the same starting balance and silently clobber each other —
+// SQLite serializes writes to a row, and the WHERE clause re-evaluates
+// against whatever the balance actually is at write time.
 async function adjustBalance(db, userId, delta, type, meta) {
-  const user = await db.prepare("SELECT balance FROM users WHERE id = ?").bind(userId).first();
-  if (!user) throw new Error("User not found");
-  const newBalance = Math.round((user.balance + delta) * 100) / 100;
-  if (newBalance < 0) throw new Error("Insufficient balance");
-  await db.prepare("UPDATE users SET balance = ? WHERE id = ?").bind(newBalance, userId).run();
-  await logWalletTx(db, userId, type, delta, newBalance, meta);
-  return newBalance;
+  const rounded = Math.round(delta * 100) / 100;
+  const row = await db
+    .prepare(
+      `UPDATE users
+       SET balance = ROUND(balance + ?, 2)
+       WHERE id = ? AND ROUND(balance + ?, 2) >= 0
+       RETURNING balance`
+    )
+    .bind(rounded, userId, rounded)
+    .first();
+
+  if (!row) {
+    const exists = await db.prepare("SELECT 1 FROM users WHERE id = ?").bind(userId).first();
+    if (!exists) throw new Error("User not found");
+    throw new Error("Insufficient balance");
+  }
+
+  await logWalletTx(db, userId, type, rounded, row.balance, meta);
+  return row.balance;
 }
 
 function publicUser(u) {
