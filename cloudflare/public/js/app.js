@@ -49,6 +49,155 @@
     toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 3000);
   }
 
+  // ---------- Daily bonus wheel ----------
+  (function dailyWheel() {
+    const btn = document.getElementById("dailyBonusBtn");
+    const modal = document.getElementById("wheelModal");
+    const closeBtn = document.getElementById("closeWheelModal");
+    const spinBtn = document.getElementById("spinWheelBtn");
+    const resultEl = document.getElementById("wheelResult");
+    const canvas = document.getElementById("wheelCanvas");
+    const wctx = canvas.getContext("2d");
+    const SEG_COLORS = ["#e50539", "#1a1a26", "#ff2d55", "#241019", "#e50539", "#1a1a26"];
+    let prizes = [100, 50, 20, 30, 40, 500];
+    let claimedToday = false;
+    let spinning = false;
+    let rotation = 0;
+
+    function drawWheel(rot) {
+      const size = canvas.width;
+      const cx = size / 2, cy = size / 2, r = size / 2 - 6;
+      const seg = (Math.PI * 2) / prizes.length;
+      wctx.clearRect(0, 0, size, size);
+      wctx.save();
+      wctx.translate(cx, cy);
+      wctx.rotate(rot);
+      for (let i = 0; i < prizes.length; i++) {
+        const a0 = -Math.PI / 2 + i * seg;
+        wctx.beginPath();
+        wctx.moveTo(0, 0);
+        wctx.arc(0, 0, r, a0, a0 + seg);
+        wctx.closePath();
+        wctx.fillStyle = SEG_COLORS[i % SEG_COLORS.length];
+        wctx.fill();
+        wctx.strokeStyle = "rgba(255,255,255,0.12)";
+        wctx.lineWidth = 2;
+        wctx.stroke();
+        // label
+        wctx.save();
+        wctx.rotate(a0 + seg / 2);
+        wctx.textAlign = "right";
+        wctx.textBaseline = "middle";
+        wctx.fillStyle = "#fff";
+        wctx.font = "800 20px 'Inter', system-ui, sans-serif";
+        wctx.fillText(String(prizes[i]), r - 14, 0);
+        wctx.restore();
+      }
+      wctx.restore();
+      // hub
+      wctx.beginPath();
+      wctx.arc(cx, cy, 20, 0, Math.PI * 2);
+      wctx.fillStyle = "#0b0b14";
+      wctx.fill();
+      wctx.strokeStyle = "#ff2d55";
+      wctx.lineWidth = 3;
+      wctx.stroke();
+    }
+
+    function setSpinState() {
+      if (claimedToday) {
+        spinBtn.disabled = true;
+        spinBtn.textContent = "Come back tomorrow";
+        btn.classList.remove("daily-bonus-ready");
+      } else {
+        spinBtn.disabled = false;
+        spinBtn.textContent = "Spin";
+        btn.classList.add("daily-bonus-ready");
+      }
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch("/api/wallet/daily-wheel", { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        prizes = data.prizes || prizes;
+        claimedToday = !!data.claimedToday;
+        if (claimedToday && data.claimedAmount != null) {
+          resultEl.textContent = `Today's win: +${data.claimedAmount}`;
+        }
+        drawWheel(rotation);
+        setSpinState();
+      } catch {
+        // wheel is a bonus extra — a failed status check just leaves it idle
+      }
+    }
+
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+    function animateTo(target, duration, done) {
+      const from = rotation;
+      const start = performance.now();
+      function frame(now) {
+        const t = Math.min(1, (now - start) / duration);
+        rotation = from + (target - from) * easeOutCubic(t);
+        drawWheel(rotation);
+        if (t < 1) requestAnimationFrame(frame);
+        else { rotation = target; done(); }
+      }
+      requestAnimationFrame(frame);
+    }
+
+    async function spin() {
+      if (spinning || claimedToday) return;
+      spinning = true;
+      spinBtn.disabled = true;
+      resultEl.textContent = "";
+      try {
+        const res = await fetch("/api/wallet/daily-wheel/spin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          resultEl.textContent = data.error || "Spin failed";
+          claimedToday = true;
+          setSpinState();
+          spinning = false;
+          return;
+        }
+        const seg = (Math.PI * 2) / prizes.length;
+        // Rotation (mod 2π) that lands segment `index` under the top pointer.
+        const desiredMod = (-(data.index * seg + seg / 2) + Math.PI * 2 * 10) % (Math.PI * 2);
+        const currentMod = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        let delta = desiredMod - currentMod;
+        if (delta < 0) delta += Math.PI * 2;
+        const target = rotation + Math.PI * 2 * 5 + delta;
+        if (typeof window.sfxTick === "function") window.sfxTick();
+        animateTo(target, 4500, () => {
+          resultEl.textContent = `🎉 You won +${data.amount}!`;
+          setBalance(data.balance);
+          claimedToday = true;
+          setSpinState();
+          spinning = false;
+          if (typeof window.sfxWin === "function") window.sfxWin();
+        });
+      } catch (err) {
+        resultEl.textContent = "Spin failed — try again";
+        spinning = false;
+        spinBtn.disabled = false;
+      }
+    }
+
+    btn.addEventListener("click", () => { modal.classList.remove("hidden"); loadStatus(); });
+    closeBtn.addEventListener("click", () => modal.classList.add("hidden"));
+    modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.add("hidden"); });
+    spinBtn.addEventListener("click", spin);
+
+    drawWheel(0);
+    loadStatus();
+  })();
+
   // ---------- History ----------
   const historyEl = document.getElementById("history");
   function pushHistory(point) {

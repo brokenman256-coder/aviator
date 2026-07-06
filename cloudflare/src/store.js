@@ -1,6 +1,6 @@
 const DEFAULTS = {
   house_edge_percent: "5",
-  signup_bonus_credits: "1000",
+  signup_bonus_credits: "0",
   min_bet: "10",
   max_bet: "10000",
 };

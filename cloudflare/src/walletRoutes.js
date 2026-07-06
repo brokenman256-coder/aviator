@@ -1,8 +1,48 @@
 import { Hono } from "hono";
 import { authRequired } from "./middleware.js";
-import { publicUser } from "./store.js";
+import { adjustBalance, publicUser } from "./store.js";
 
 const wallet = new Hono();
+
+// Prizes on the daily spin wheel, in wheel-segment order.
+const WHEEL_PRIZES = [100, 50, 20, 30, 40, 500];
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10); // UTC calendar day
+}
+
+// Whether the player has already spun today, plus the wheel layout.
+wallet.get("/daily-wheel", authRequired, async (c) => {
+  const claim = await c.env.DB.prepare(
+    "SELECT amount FROM daily_bonus_claims WHERE user_id = ? AND claim_date = ?"
+  ).bind(c.get("user").id, todayKey()).first();
+  return c.json({
+    prizes: WHEEL_PRIZES,
+    claimedToday: !!claim,
+    claimedAmount: claim ? claim.amount : null,
+  });
+});
+
+wallet.post("/daily-wheel/spin", authRequired, async (c) => {
+  const user = c.get("user");
+  const date = todayKey();
+  const index = Math.floor(Math.random() * WHEEL_PRIZES.length);
+  const amount = WHEEL_PRIZES[index];
+  const now = new Date().toISOString();
+
+  // The unique (user_id, claim_date) index makes this the atomic gate: only the
+  // first spin of the day inserts a row; a second one changes nothing.
+  const insert = await c.env.DB.prepare(
+    "INSERT OR IGNORE INTO daily_bonus_claims (user_id, claim_date, amount, created_at) VALUES (?, ?, ?, ?)"
+  ).bind(user.id, date, amount, now).run();
+
+  if (!insert.meta.changes) {
+    return c.json({ error: "You've already spun the wheel today — come back tomorrow." }, 400);
+  }
+
+  const balance = await adjustBalance(c.env.DB, user.id, amount, "daily_wheel", { date });
+  return c.json({ index, amount, balance });
+});
 
 wallet.get("/me", authRequired, async (c) => {
   const { results } = await c.env.DB.prepare(

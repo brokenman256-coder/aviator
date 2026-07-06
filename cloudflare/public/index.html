@@ -15,6 +15,7 @@
       </div>
       <div class="topbar-right">
         <span id="usernamePill" class="username-pill"></span>
+        <button id="dailyBonusBtn" class="ghost-btn">🎡 Daily Bonus</button>
         <a class="ghost-btn" href="wallet.html">Wallet</a>
         <a id="adminLink" class="ghost-btn section-hidden" href="admin.html">Admin</a>
         <div class="balance">
@@ -120,6 +121,24 @@
         </button>
       </div>
     </section>
+  </div>
+
+  <div id="wheelModal" class="modal hidden">
+    <div class="modal-card" style="max-width:420px; text-align:center;">
+      <div class="modal-header">
+        <span>🎡 Daily Bonus Wheel</span>
+        <button id="closeWheelModal" class="ghost-btn">✕</button>
+      </div>
+      <p style="font-size:12px; color:var(--text-dim); margin:0 0 12px;">
+        Spin once a day for free credits. Resets at midnight (UTC).
+      </p>
+      <div class="wheel-wrap">
+        <div class="wheel-pointer"></div>
+        <canvas id="wheelCanvas" width="300" height="300"></canvas>
+      </div>
+      <div id="wheelResult" class="wheel-result"></div>
+      <button id="spinWheelBtn" class="primary-btn" style="width:100%; margin-top:12px;">Spin</button>
+    </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
