@@ -9,6 +9,7 @@ import {
   verifyWebhookSignature,
   getRazorpayConfig,
 } from "./razorpay.js";
+import { validateScreenshot, publicRechargeRequest } from "./paymentProof.js";
 
 const wallet = new Hono();
 
@@ -159,26 +160,48 @@ wallet.get("/referral", authRequired, async (c) => {
   });
 });
 
+wallet.get("/payment-info", authRequired, async (c) => {
+  const creditsPerRupee = await getNumberSetting(c.env.DB, "credits_per_rupee");
+  return c.json({
+    upiId: await getSetting(c.env.DB, "payment_upi_id"),
+    instructions: await getSetting(c.env.DB, "payment_instructions"),
+    creditsPerRupee: isFinite(creditsPerRupee) && creditsPerRupee > 0 ? creditsPerRupee : 1,
+    minAmountInr: 10,
+  });
+});
+
 wallet.get("/recharge-requests", authRequired, async (c) => {
   const { results } = await c.env.DB.prepare(
-    "SELECT * FROM recharge_requests WHERE user_id = ? ORDER BY id DESC LIMIT 30"
+    `SELECT id, user_id, amount, amount_inr, payment_reference, type, status, admin_note,
+            resolved_by, resolved_at, created_at, screenshot_mime,
+            CASE WHEN screenshot_data IS NOT NULL THEN 1 ELSE 0 END AS has_screenshot
+     FROM recharge_requests WHERE user_id = ? ORDER BY id DESC LIMIT 30`
   )
     .bind(c.get("user").id)
     .all();
-  return c.json({ requests: results });
+  return c.json({
+    requests: results.map((r) => ({
+      ...r,
+      hasScreenshot: !!r.has_screenshot,
+      has_screenshot: undefined,
+    })),
+  });
+});
+
+wallet.get("/recharge-requests/:id/screenshot", authRequired, async (c) => {
+  const id = Number(c.req.param("id"));
+  const row = await c.env.DB.prepare(
+    "SELECT user_id, screenshot_mime, screenshot_data FROM recharge_requests WHERE id = ?"
+  ).bind(id).first();
+  if (!row || row.user_id !== c.get("user").id) return c.json({ error: "Not found" }, 404);
+  if (!row.screenshot_data) return c.json({ error: "No screenshot" }, 404);
+  return c.json({ mimeType: row.screenshot_mime, data: row.screenshot_data });
 });
 
 wallet.post("/recharge-request", authRequired, async (c) => {
   const user = c.get("user");
-  const { amount, type } = await c.req.json().catch(() => ({}));
-  const requestType = type === "withdrawal" ? "withdrawal" : "recharge";
-  const parsed = Math.round(Number(amount) * 100) / 100;
-  if (!isFinite(parsed) || parsed <= 0 || parsed > 1000000) {
-    return c.json({ error: "Enter a valid amount" }, 400);
-  }
-  if (requestType === "withdrawal" && parsed > user.balance) {
-    return c.json({ error: "You can't request a withdrawal larger than your current balance" }, 400);
-  }
+  const body = await c.req.json().catch(() => ({}));
+  const requestType = body.type === "withdrawal" ? "withdrawal" : "recharge";
 
   const pending = await c.env.DB.prepare(
     "SELECT id FROM recharge_requests WHERE user_id = ? AND status = 'pending'"
@@ -186,11 +209,47 @@ wallet.post("/recharge-request", authRequired, async (c) => {
   if (pending) return c.json({ error: "You already have a pending request" }, 400);
 
   const now = new Date().toISOString();
-  const info = await c.env.DB.prepare(
-    "INSERT INTO recharge_requests (user_id, amount, type, status, created_at) VALUES (?, ?, ?, 'pending', ?)"
-  ).bind(user.id, parsed, requestType, now).run();
 
-  return c.json({ id: info.meta.last_row_id, status: "pending", type: requestType });
+  if (requestType === "withdrawal") {
+    const parsed = Math.round(Number(body.amount) * 100) / 100;
+    if (!isFinite(parsed) || parsed <= 0 || parsed > 1000000) {
+      return c.json({ error: "Enter a valid amount" }, 400);
+    }
+    if (parsed > user.balance) {
+      return c.json({ error: "You can't request a withdrawal larger than your current balance" }, 400);
+    }
+    const info = await c.env.DB.prepare(
+      "INSERT INTO recharge_requests (user_id, amount, type, status, created_at) VALUES (?, ?, ?, 'pending', ?)"
+    ).bind(user.id, parsed, requestType, now).run();
+    return c.json({ id: info.meta.last_row_id, status: "pending", type: requestType });
+  }
+
+  const amountInr = Math.round(Number(body.amountInr) * 100) / 100;
+  if (!isFinite(amountInr) || amountInr < 10 || amountInr > 50000) {
+    return c.json({ error: "Enter a valid payment amount (₹10 – ₹50,000)" }, 400);
+  }
+
+  const proof = validateScreenshot(body.screenshotMime, body.screenshot);
+  if (!proof.ok) return c.json({ error: proof.error }, 400);
+
+  const creditsPerRupee = await getNumberSetting(c.env.DB, "credits_per_rupee");
+  const rate = isFinite(creditsPerRupee) && creditsPerRupee > 0 ? creditsPerRupee : 1;
+  const credits = Math.round(amountInr * rate * 100) / 100;
+  const paymentRef = String(body.paymentReference || "").trim().slice(0, 64) || null;
+
+  const info = await c.env.DB.prepare(
+    `INSERT INTO recharge_requests
+      (user_id, amount, amount_inr, payment_reference, screenshot_mime, screenshot_data, type, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'recharge', 'pending', ?)`
+  ).bind(user.id, credits, amountInr, paymentRef, body.screenshotMime, proof.data, now).run();
+
+  return c.json({
+    id: info.meta.last_row_id,
+    status: "pending",
+    type: "recharge",
+    amountInr,
+    credits,
+  });
 });
 
 // ---------- Razorpay online payments ----------

@@ -52,6 +52,8 @@ admin.get("/settings", async (c) => {
     referralBonusCredits: Number(await getSetting(c.env.DB, "referral_bonus_credits")),
     streakBonusPerDay: Number(await getSetting(c.env.DB, "streak_bonus_per_day")),
     creditsPerRupee: Number(await getSetting(c.env.DB, "credits_per_rupee")),
+    paymentUpiId: await getSetting(c.env.DB, "payment_upi_id"),
+    paymentInstructions: await getSetting(c.env.DB, "payment_instructions"),
     wheelPrizes: await getSetting(c.env.DB, "wheel_prizes"),
     wheelWeights: await getSetting(c.env.DB, "wheel_weights"),
     siteName: await getSetting(c.env.DB, "site_name"),
@@ -76,6 +78,8 @@ admin.post("/settings", async (c) => {
     referralBonusCredits,
     streakBonusPerDay,
     creditsPerRupee,
+    paymentUpiId,
+    paymentInstructions,
     wheelPrizes,
     wheelWeights,
     siteName,
@@ -100,6 +104,12 @@ admin.post("/settings", async (c) => {
   }
   if (creditsPerRupee !== undefined) {
     await setSetting(c.env.DB, "credits_per_rupee", Math.max(0.01, Number(creditsPerRupee)));
+  }
+  if (paymentUpiId !== undefined) {
+    await setSetting(c.env.DB, "payment_upi_id", String(paymentUpiId).trim().slice(0, 64));
+  }
+  if (paymentInstructions !== undefined) {
+    await setSetting(c.env.DB, "payment_instructions", String(paymentInstructions).trim().slice(0, 500));
   }
   if (wheelPrizes !== undefined) {
     const clean = sanitizeCsvNums(wheelPrizes);
@@ -200,15 +210,44 @@ admin.get("/recharge-requests", async (c) => {
   const status = c.req.query("status");
   const query = status
     ? c.env.DB.prepare(
-        `SELECT rr.*, u.username FROM recharge_requests rr JOIN users u ON u.id = rr.user_id
+        `SELECT rr.id, rr.user_id, rr.amount, rr.amount_inr, rr.payment_reference, rr.type, rr.status,
+                rr.admin_note, rr.resolved_by, rr.resolved_at, rr.created_at, rr.screenshot_mime,
+                CASE WHEN rr.screenshot_data IS NOT NULL THEN 1 ELSE 0 END AS has_screenshot,
+                u.username
+         FROM recharge_requests rr JOIN users u ON u.id = rr.user_id
          WHERE rr.status = ? ORDER BY rr.id DESC LIMIT 100`
       ).bind(status)
     : c.env.DB.prepare(
-        `SELECT rr.*, u.username FROM recharge_requests rr JOIN users u ON u.id = rr.user_id
+        `SELECT rr.id, rr.user_id, rr.amount, rr.amount_inr, rr.payment_reference, rr.type, rr.status,
+                rr.admin_note, rr.resolved_by, rr.resolved_at, rr.created_at, rr.screenshot_mime,
+                CASE WHEN rr.screenshot_data IS NOT NULL THEN 1 ELSE 0 END AS has_screenshot,
+                u.username
+         FROM recharge_requests rr JOIN users u ON u.id = rr.user_id
          ORDER BY rr.id DESC LIMIT 100`
       );
   const { results } = await query.all();
-  return c.json({ requests: results });
+  return c.json({
+    requests: results.map((r) => ({
+      ...r,
+      hasScreenshot: !!r.has_screenshot,
+      has_screenshot: undefined,
+    })),
+  });
+});
+
+admin.get("/recharge-requests/:id/screenshot", async (c) => {
+  const id = Number(c.req.param("id"));
+  const row = await c.env.DB.prepare(
+    "SELECT screenshot_mime, screenshot_data, amount_inr, payment_reference, type FROM recharge_requests WHERE id = ?"
+  ).bind(id).first();
+  if (!row?.screenshot_data) return c.json({ error: "No screenshot" }, 404);
+  return c.json({
+    mimeType: row.screenshot_mime,
+    data: row.screenshot_data,
+    amountInr: row.amount_inr,
+    paymentReference: row.payment_reference,
+    type: row.type,
+  });
 });
 
 admin.post("/recharge-requests/:id/approve", async (c) => {
