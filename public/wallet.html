@@ -5,39 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Aviator — Wallet</title>
 <link rel="stylesheet" href="css/style.css" />
+<style>
+  .payment-box { background:#1f1f1f; padding:20px; border-radius:12px; margin:15px 0; text-align:center; }
+  .qr-img { max-width:280px; border:3px solid gold; border-radius:10px; margin:10px 0; }
+</style>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand">
-        <span class="brand-icon"><svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M2 12L22 2L14 22L11 13L2 12Z"/></svg></span>
-        <span class="brand-name">WALLET</span>
-      </div>
+      <div class="brand"><span class="brand-name">💰 WALLET</span></div>
       <div class="topbar-right">
-        <span id="usernamePill" class="username-pill"></span>
-        <a class="ghost-btn" href="index.html">Back to game</a>
-        <button id="logoutBtn" class="ghost-btn">Log out</button>
+        <span id="usernamePill"></span>
+        <a href="index.html" class="ghost-btn">Game</a>
+        <button id="logoutBtn" class="ghost-btn">Logout</button>
       </div>
     </header>
 
     <div class="panel">
-      <h2>Balance</h2>
-      <div class="wallet-summary">
-        <div class="wallet-balance-value" id="walletBalance">0.00</div>
-        <span class="ghost-btn" style="cursor:default;">Credits</span>
+      <h2>Balance: <span id="walletBalance" style="color:#ffd700;">0.00</span></h2>
+    </div>
+
+    <!-- Deposit -->
+    <div class="panel payment-box">
+      <h2>Deposit Funds</h2>
+      <p>Scan this QR to add credits</p>
+      <div id="depositQRContainer">
+        <img id="depositQR" class="qr-img" alt="Deposit QR" style="display:none;">
+        <p id="noQR">Admin QR coming soon...</p>
       </div>
     </div>
 
+    <!-- Withdraw -->
+    <div class="panel payment-box">
+      <h2>Request Withdrawal</h2>
+      <input type="number" id="withdrawAmount" placeholder="Amount" value="100" style="width:100%; padding:12px; margin:10px 0;">
+      <input type="text" id="withdrawUPI" placeholder="Your UPI ID" style="width:100%; padding:12px; margin:10px 0;">
+      <button id="submitWithdrawBtn" style="width:100%; padding:15px; background:#28a745; color:white; border:none; border-radius:8px; font-size:16px;">Submit Withdrawal Request</button>
+    </div>
+
     <div class="panel">
-      <h2>Recent Activity</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Date</th><th>Type</th><th>Amount</th><th>Balance After</th></tr>
-          </thead>
-          <tbody id="txTableBody"></tbody>
-        </table>
-      </div>
+      <h2>Transaction History</h2>
+      <div id="txHistory"></div>
     </div>
   </div>
 
