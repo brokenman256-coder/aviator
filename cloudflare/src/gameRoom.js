@@ -384,6 +384,11 @@ export class GameRoom extends DurableObject {
       roundId: this.round ? this.round.id : null,
       msInPhase: Date.now() - this.phaseStart,
       waitMs: WAIT_MS,
+      // Safe to include once the round has already crashed (it's history, not
+      // a future reveal) — lets a client that (re)connects during the brief
+      // post-crash freeze render the plane at its real final position instead
+      // of freezing on an unknown crash point.
+      crashPoint: this.phase === "crashed" && this.round ? this.round.crashPoint : undefined,
     };
   }
 }

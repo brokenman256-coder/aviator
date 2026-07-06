@@ -311,7 +311,32 @@
     game.phaseStartLocal = performance.now() - state.msInPhase;
     game.waitMs = state.waitMs;
     game.currentMultiplier = state.multiplier;
+    // Clear any tick cached before this (re)connect — otherwise a reconnect
+    // (network drop, phone lock, wifi/data switch) can leave the plane
+    // extrapolating from a stale, possibly previous-round timestamp instead
+    // of the fresh state the server just sent, which looks like a freeze.
+    game.lastTick = null;
     updateRoundBadge(state.roundId);
+    if (state.state === "crashed" && state.crashPoint) {
+      // Resyncing straight into the post-crash freeze: this player never saw
+      // the "round:crashed" event, so set the same visuals it would have set.
+      game.crashPoint = state.crashPoint;
+      multiplierTextEl.classList.remove("flying");
+      multiplierTextEl.classList.add("crashed");
+      multiplierTextEl.textContent = state.crashPoint.toFixed(2) + "x";
+      stateTextEl.textContent = "Flew away!";
+      ringEl.classList.add("hidden");
+    } else if (state.state === "running") {
+      multiplierTextEl.classList.remove("crashed");
+      multiplierTextEl.classList.add("flying");
+      stateTextEl.textContent = "Flying…";
+      ringEl.classList.add("hidden");
+    } else if (state.state === "waiting") {
+      game.currentMultiplier = 1;
+      multiplierTextEl.classList.remove("flying", "crashed");
+      multiplierTextEl.textContent = "1.00x";
+      ringEl.classList.remove("hidden");
+    }
   });
 
   socket.on("round:waiting", ({ waitMs, roundId }) => {
