@@ -56,6 +56,7 @@
     const closeBtn = document.getElementById("closeWheelModal");
     const spinBtn = document.getElementById("spinWheelBtn");
     const resultEl = document.getElementById("wheelResult");
+    const streakEl = document.getElementById("wheelStreak");
     const canvas = document.getElementById("wheelCanvas");
     const wctx = canvas.getContext("2d");
     const SEG_COLORS = ["#e50539", "#1a1a26", "#ff2d55", "#241019", "#e50539", "#1a1a26"];
@@ -63,6 +64,11 @@
     let claimedToday = false;
     let spinning = false;
     let rotation = 0;
+    let streak = 0;
+
+    function renderStreak() {
+      streakEl.textContent = streak > 0 ? `🔥 ${streak}-day streak` : "Spin daily to build a streak 🔥";
+    }
 
     function drawWheel(rot) {
       const size = canvas.width;
@@ -123,9 +129,11 @@
         const data = await res.json();
         prizes = data.prizes || prizes;
         claimedToday = !!data.claimedToday;
+        streak = data.streak || 0;
         if (claimedToday && data.claimedAmount != null) {
           resultEl.textContent = `Today's win: +${data.claimedAmount}`;
         }
+        renderStreak();
         drawWheel(rotation);
         setSpinState();
       } catch {
@@ -175,9 +183,12 @@
         const target = rotation + Math.PI * 2 * 5 + delta;
         if (typeof window.sfxTick === "function") window.sfxTick();
         animateTo(target, 4500, () => {
-          resultEl.textContent = `🎉 You won +${data.amount}!`;
+          const bonusMsg = data.streakBonus ? ` +${data.streakBonus} streak bonus` : "";
+          resultEl.textContent = `🎉 You won +${data.amount}!${bonusMsg}`;
           setBalance(data.balance);
           claimedToday = true;
+          streak = data.streak || streak;
+          renderStreak();
           setSpinState();
           spinning = false;
           if (typeof window.sfxWin === "function") window.sfxWin();

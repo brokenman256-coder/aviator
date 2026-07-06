@@ -11,15 +11,30 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10); // UTC calendar day
 }
 
-// Whether the player has already spun today, plus the wheel layout.
+function dayKeyOffset(days) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// Streak bonus grows with the run of consecutive days, capped so it stays modest.
+function streakBonusFor(streak) {
+  return Math.min(streak, 7) * 10;
+}
+
+// Whether the player has already spun today, plus the wheel layout and streak.
 wallet.get("/daily-wheel", authRequired, async (c) => {
+  const user = c.get("user");
   const claim = await c.env.DB.prepare(
     "SELECT amount FROM daily_bonus_claims WHERE user_id = ? AND claim_date = ?"
-  ).bind(c.get("user").id, todayKey()).first();
+  ).bind(user.id, todayKey()).first();
+  // A streak only still counts if the last spin was today or yesterday.
+  const stillValid = user.last_spin_date === todayKey() || user.last_spin_date === dayKeyOffset(-1);
   return c.json({
     prizes: WHEEL_PRIZES,
     claimedToday: !!claim,
     claimedAmount: claim ? claim.amount : null,
+    streak: stillValid ? user.daily_streak : 0,
   });
 });
 
@@ -40,8 +55,17 @@ wallet.post("/daily-wheel/spin", authRequired, async (c) => {
     return c.json({ error: "You've already spun the wheel today — come back tomorrow." }, 400);
   }
 
-  const balance = await adjustBalance(c.env.DB, user.id, amount, "daily_wheel", { date });
-  return c.json({ index, amount, balance });
+  // Streak: incrementing if the previous spin was yesterday, otherwise reset to 1.
+  const streak = user.last_spin_date === dayKeyOffset(-1) ? (user.daily_streak || 0) + 1 : 1;
+  await c.env.DB.prepare(
+    "UPDATE users SET daily_streak = ?, last_spin_date = ? WHERE id = ?"
+  ).bind(streak, date, user.id).run();
+
+  await adjustBalance(c.env.DB, user.id, amount, "daily_wheel", { date });
+  const streakBonus = streakBonusFor(streak);
+  const balance = await adjustBalance(c.env.DB, user.id, streakBonus, "streak_bonus", { date, streak });
+
+  return c.json({ index, amount, streak, streakBonus, balance });
 });
 
 wallet.get("/me", authRequired, async (c) => {

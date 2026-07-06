@@ -779,6 +779,13 @@ th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: 
   z-index: 2;
 }
 
+.wheel-streak {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--amber-bright);
+  margin-bottom: 10px;
+}
+
 .wheel-result {
   min-height: 22px;
   margin-top: 12px;
