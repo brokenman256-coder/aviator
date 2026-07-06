@@ -20,12 +20,7 @@
     payout: "Cash out",
     signup_bonus: "Signup bonus",
     admin_adjust: "Admin adjustment",
-    referral_bonus: "Referral bonus",
-    recharge_approved: "Recharge approved",
-    withdrawal_approved: "Withdrawal approved",
   };
-
-  const STATUS_PILL = { pending: "warn", approved: "ok", rejected: "bad" };
 
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => ({
@@ -40,9 +35,6 @@
 
     document.getElementById("usernamePill").textContent = user.username;
     document.getElementById("walletBalance").textContent = Number(user.balance).toFixed(2);
-    if (user.referralCode) {
-      document.getElementById("referralLink").value = `${location.origin}/login.html?ref=${user.referralCode}`;
-    }
 
     const tbody = document.getElementById("txTableBody");
     tbody.innerHTML = "";
@@ -67,71 +59,5 @@
     }
   }
 
-  async function loadRechargeRequests() {
-    const res = await fetch("/api/wallet/recharge-requests", { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return;
-    const { requests } = await res.json();
-    const tbody = document.getElementById("rechargeTableBody");
-    tbody.innerHTML = requests.length
-      ? requests.map((r) => `
-          <tr>
-            <td>${new Date(r.created_at).toLocaleString()}</td>
-            <td>${r.type === "withdrawal" ? "Withdrawal" : "Recharge"}</td>
-            <td>${Number(r.amount).toFixed(2)}</td>
-            <td><span class="pill ${STATUS_PILL[r.status] || ""}">${escapeHtml(r.status)}</span></td>
-          </tr>`).join("")
-      : `<tr><td colspan="4" style="color:var(--text-dim);">No requests yet.</td></tr>`;
-  }
-
-  async function submitFundRequest(type, amountInputId, errorBoxId) {
-    const errorBox = document.getElementById(errorBoxId);
-    errorBox.classList.add("hidden");
-    const amountInput = document.getElementById(amountInputId);
-    const amount = Number(amountInput.value);
-    if (!isFinite(amount) || amount <= 0) {
-      errorBox.textContent = "Enter a valid amount";
-      errorBox.classList.remove("hidden");
-      return;
-    }
-    try {
-      const res = await fetch("/api/wallet/recharge-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amount, type }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
-      amountInput.value = "";
-      await loadRechargeRequests();
-    } catch (err) {
-      errorBox.textContent = err.message;
-      errorBox.classList.remove("hidden");
-    }
-  }
-
-  document.getElementById("submitRechargeBtn").addEventListener("click", () => {
-    submitFundRequest("recharge", "rechargeAmount", "rechargeError");
-  });
-
-  document.getElementById("submitWithdrawBtn").addEventListener("click", () => {
-    submitFundRequest("withdrawal", "withdrawAmount", "withdrawError");
-  });
-
-  document.getElementById("copyReferralBtn").addEventListener("click", async () => {
-    const input = document.getElementById("referralLink");
-    input.select();
-    try {
-      await navigator.clipboard.writeText(input.value);
-      const btn = document.getElementById("copyReferralBtn");
-      const original = btn.textContent;
-      btn.textContent = "Copied!";
-      setTimeout(() => (btn.textContent = original), 1500);
-    } catch {
-      // clipboard API unavailable (e.g. insecure context) — the field is
-      // selected above so the user can still copy manually with Ctrl/Cmd+C.
-    }
-  });
-
   load();
-  loadRechargeRequests();
 })();

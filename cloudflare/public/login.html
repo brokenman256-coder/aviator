@@ -34,7 +34,6 @@
       </form>
 
       <form id="registerForm" class="section-hidden">
-        <div class="info-box hidden" id="referralNote" style="margin-bottom:10px;"></div>
         <div class="field">
           <label>Username</label>
           <input type="text" id="registerUsername" required minlength="3" maxlength="20" />
@@ -44,26 +43,11 @@
           <input type="email" id="registerEmail" required autocomplete="email" />
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>Phone number</label>
-          <input type="tel" id="registerPhone" required pattern="[0-9]{7,15}" autocomplete="tel" placeholder="Digits only" />
-        </div>
-        <div class="field" style="margin-top:10px;">
           <label>Password</label>
           <input type="password" id="registerPassword" required minlength="6" autocomplete="new-password" />
         </div>
         <button type="submit" class="primary-btn" style="margin-top:14px; width:100%;">Create Account</button>
       </form>
-    </div>
-
-    <div class="auth-card section-hidden" id="otpCard">
-      <div style="font-weight:700;">Verify your account</div>
-      <div class="info-box" id="otpInfo"></div>
-      <div class="field">
-        <label>6-digit code</label>
-        <input type="text" id="otpCode" class="otp-input" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
-      </div>
-      <button id="verifyBtn" class="primary-btn">Verify &amp; Continue</button>
-      <button id="resendBtn" class="link-btn">Resend code</button>
     </div>
   </div>
 

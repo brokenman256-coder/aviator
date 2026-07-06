@@ -39,46 +39,6 @@
   }
   loadSelf();
 
-  // ---------- Site banner ----------
-  async function loadBanner() {
-    try {
-      const res = await fetch("/api/banner");
-      const b = await res.json();
-      const banner = document.getElementById("siteBanner");
-      if (!b.enabled) {
-        banner.classList.add("hidden");
-        return;
-      }
-      document.getElementById("siteBannerTitle").textContent = b.title || "";
-      document.getElementById("siteBannerMessage").textContent = b.message || "";
-      const img = document.getElementById("siteBannerImage");
-      if (b.imageDataUrl) {
-        img.src = b.imageDataUrl;
-        img.classList.remove("hidden");
-      } else {
-        img.classList.add("hidden");
-      }
-      banner.classList.remove("hidden");
-    } catch {
-      // banner is decorative — a failed fetch just means it stays hidden
-    }
-  }
-  loadBanner();
-
-  // ---------- Site settings (admin-customizable player-facing text) ----------
-  async function loadSiteSettings() {
-    try {
-      const res = await fetch("/api/site-settings");
-      const s = await res.json();
-      if (s.feedbackSectionTitle) {
-        document.getElementById("feedbackSectionTitle").textContent = s.feedbackSectionTitle;
-      }
-    } catch {
-      // keep the default heading text if this fails
-    }
-  }
-  loadSiteSettings();
-
   // ---------- Toast ----------
   const toastEl = document.getElementById("toast");
   let toastTimer = null;
@@ -534,42 +494,4 @@
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
-
-  // ---------- Feedback ----------
-  let selectedRating = 0;
-  const starButtons = document.querySelectorAll(".star-btn");
-  starButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      selectedRating = Number(btn.dataset.value);
-      starButtons.forEach((b) => b.classList.toggle("active", Number(b.dataset.value) <= selectedRating));
-    });
-  });
-
-  document.getElementById("submitFeedbackBtn").addEventListener("click", async () => {
-    const errorBox = document.getElementById("feedbackError");
-    const successBox = document.getElementById("feedbackSuccess");
-    errorBox.classList.add("hidden");
-    successBox.classList.add("hidden");
-    if (!selectedRating) {
-      errorBox.textContent = "Pick a star rating first";
-      errorBox.classList.remove("hidden");
-      return;
-    }
-    try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ rating: selectedRating, message: document.getElementById("feedbackMessage").value }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
-      successBox.classList.remove("hidden");
-      document.getElementById("feedbackMessage").value = "";
-      selectedRating = 0;
-      starButtons.forEach((b) => b.classList.remove("active"));
-    } catch (err) {
-      errorBox.textContent = err.message;
-      errorBox.classList.remove("hidden");
-    }
-  });
 })();

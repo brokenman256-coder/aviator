@@ -32,29 +32,6 @@
       </div>
 
       <div class="panel">
-        <h2>Site Banner <span style="color:var(--text-dim); font-size:11px; text-transform:none; font-family:inherit;">(shown to every player at the top of the game page)</span></h2>
-        <div class="error-box hidden" id="bannerError"></div>
-        <img id="bannerPreview" style="max-width:100%; max-height:140px; border-radius:4px; display:none; border:1px solid var(--border);" />
-        <div class="field">
-          <label>Image</label>
-          <input type="file" id="bannerImageInput" accept="image/png,image/jpeg,image/gif,image/webp" />
-        </div>
-        <div class="field">
-          <label>Title</label>
-          <input type="text" id="bannerTitle" maxlength="80" />
-        </div>
-        <div class="field">
-          <label>Message</label>
-          <textarea id="bannerMessage" class="field-textarea" rows="2" maxlength="300"></textarea>
-        </div>
-        <label class="auto-toggle">
-          <input type="checkbox" id="bannerEnabled" />
-          Show this banner to players
-        </label>
-        <button id="saveBannerBtn" class="primary-btn" style="width:fit-content; padding:9px 20px;">Save Banner</button>
-      </div>
-
-      <div class="panel">
         <h2>Live Round <span style="color:var(--text-dim); font-size:11px; text-transform:none; font-family:inherit;">(admin-only — not visible to players)</span></h2>
         <div class="admin-grid">
           <div class="stat-card"><div class="stat-label">Round</div><div class="stat-value" id="liveRoundId" style="font-size:16px;">—</div></div>
@@ -80,20 +57,12 @@
             <input type="number" id="settingBonus" min="0" step="1" />
           </div>
           <div class="field">
-            <label>Referral bonus (credits, each side)</label>
-            <input type="number" id="settingReferralBonus" min="0" step="1" />
-          </div>
-          <div class="field">
             <label>Min bet</label>
             <input type="number" id="settingMinBet" min="1" step="1" />
           </div>
           <div class="field">
             <label>Max bet</label>
             <input type="number" id="settingMaxBet" min="1" step="1" />
-          </div>
-          <div class="field">
-            <label>Feedback section title</label>
-            <input type="text" id="settingFeedbackTitle" maxlength="80" />
           </div>
         </div>
         <button id="saveSettingsBtn" class="primary-btn" style="width:fit-content; padding:9px 20px;">Save Settings</button>
@@ -105,23 +74,11 @@
           <table>
             <thead>
               <tr>
-                <th>ID</th><th>Username</th><th>Email</th><th>Phone</th><th>Balance</th>
-                <th>Verified</th><th>Status</th><th>Role</th><th>Actions</th>
+                <th>ID</th><th>Username</th><th>Email</th><th>Balance</th>
+                <th>Status</th><th>Role</th><th>Actions</th>
               </tr>
             </thead>
             <tbody id="usersTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>Fund Requests</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>ID</th><th>User</th><th>Type</th><th>Amount</th><th>Status</th><th>Requested</th><th>Actions</th></tr>
-            </thead>
-            <tbody id="rechargeTableBody"></tbody>
           </table>
         </div>
       </div>
@@ -137,30 +94,6 @@
           </table>
         </div>
       </div>
-
-      <div class="panel">
-        <h2>Activity Log</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Time</th><th>User</th><th>Type</th><th>Amount</th><th>Balance After</th></tr>
-            </thead>
-            <tbody id="activityTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>Player Feedback</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Time</th><th>User</th><th>Rating</th><th>Message</th></tr>
-            </thead>
-            <tbody id="feedbackTableBody"></tbody>
-          </table>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -171,8 +104,6 @@
         <button id="closeUserModal" class="ghost-btn">✕</button>
       </div>
       <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
-        <div id="userModalReferrals" style="font-size:12px; color:var(--text-dim);"></div>
-
         <div class="panel" style="padding:12px; gap:8px;">
           <div style="font-weight:700; font-size:13px;">Adjust Balance</div>
           <div class="error-box hidden" id="adjustError"></div>

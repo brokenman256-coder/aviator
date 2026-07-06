@@ -26,50 +26,8 @@
         <div class="wallet-balance-value" id="walletBalance">0.00</div>
         <span class="ghost-btn" style="cursor:default;">Credits</span>
       </div>
-    </div>
-
-    <div class="panel">
-      <h2>Request Recharge</h2>
       <div style="font-size:12px; color:var(--text-dim);">
-        Ask an admin to add credits to your balance. Your request stays pending until an admin approves or rejects it.
-      </div>
-      <div class="error-box hidden" id="rechargeError"></div>
-      <div class="amount-row">
-        <input type="number" id="rechargeAmount" class="amount-input" min="1" step="1" placeholder="Amount" style="text-align:left;" />
-        <button id="submitRechargeBtn" class="step-btn" style="width:auto; padding:0 14px;">Submit Request</button>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>Request Withdrawal</h2>
-      <div style="font-size:12px; color:var(--text-dim);">
-        Ask an admin to remove credits from your balance. Stays pending until approved or rejected; can't exceed your current balance.
-      </div>
-      <div class="error-box hidden" id="withdrawError"></div>
-      <div class="amount-row">
-        <input type="number" id="withdrawAmount" class="amount-input" min="1" step="1" placeholder="Amount" style="text-align:left;" />
-        <button id="submitWithdrawBtn" class="step-btn" style="width:auto; padding:0 14px;">Submit Request</button>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>Fund Request History</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead>
-          <tbody id="rechargeTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>Invite Friends</h2>
-      <div style="font-size:12px; color:var(--text-dim);">
-        Share your link — when a friend signs up and verifies their account, you both get a bonus.
-      </div>
-      <div class="amount-row">
-        <input type="text" id="referralLink" readonly class="amount-input" style="font-weight:400; text-align:left;" />
-        <button id="copyReferralBtn" class="step-btn" style="width:auto; padding:0 14px;">Copy</button>
+        Ask an admin to add or remove credits from your balance.
       </div>
     </div>
 

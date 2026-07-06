@@ -47,30 +47,21 @@ admin.get("/settings", async (c) => {
   return c.json({
     houseEdgePercent: Number(await getSetting(c.env.DB, "house_edge_percent")),
     signupBonusCredits: Number(await getSetting(c.env.DB, "signup_bonus_credits")),
-    referralBonusCredits: Number(await getSetting(c.env.DB, "referral_bonus_credits")),
     minBet: Number(await getSetting(c.env.DB, "min_bet")),
     maxBet: Number(await getSetting(c.env.DB, "max_bet")),
-    feedbackSectionTitle: await getSetting(c.env.DB, "feedback_section_title"),
   });
 });
 
 admin.post("/settings", async (c) => {
-  const { houseEdgePercent, signupBonusCredits, referralBonusCredits, minBet, maxBet, feedbackSectionTitle } = await c.req.json().catch(() => ({}));
+  const { houseEdgePercent, signupBonusCredits, minBet, maxBet } = await c.req.json().catch(() => ({}));
   if (houseEdgePercent !== undefined) {
     await setSetting(c.env.DB, "house_edge_percent", Math.min(50, Math.max(0, Number(houseEdgePercent))));
   }
   if (signupBonusCredits !== undefined) {
     await setSetting(c.env.DB, "signup_bonus_credits", Math.max(0, Number(signupBonusCredits)));
   }
-  if (referralBonusCredits !== undefined) {
-    await setSetting(c.env.DB, "referral_bonus_credits", Math.max(0, Number(referralBonusCredits)));
-  }
   if (minBet !== undefined) await setSetting(c.env.DB, "min_bet", Math.max(1, Number(minBet)));
   if (maxBet !== undefined) await setSetting(c.env.DB, "max_bet", Math.max(1, Number(maxBet)));
-  if (feedbackSectionTitle !== undefined) {
-    const trimmed = String(feedbackSectionTitle).trim().slice(0, 80);
-    await setSetting(c.env.DB, "feedback_section_title", trimmed || "Review & Feedback");
-  }
   return c.json({ ok: true });
 });
 
@@ -112,11 +103,8 @@ admin.get("/users/:id", async (c) => {
   const { results: transactions } = await c.env.DB.prepare(
     "SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY id DESC LIMIT 50"
   ).bind(userId).all();
-  const referredUsers = await c.env.DB.prepare(
-    "SELECT id, username FROM users WHERE referred_by = ?"
-  ).bind(userId).all();
 
-  return c.json({ user: publicUser(user), bets, transactions, referredUsers: referredUsers.results });
+  return c.json({ user: publicUser(user), bets, transactions });
 });
 
 // Deletes a user account entirely, including their bets and wallet ledger.
@@ -126,24 +114,10 @@ admin.post("/users/:id/delete", async (c) => {
 
   await c.env.DB.prepare("DELETE FROM wallet_transactions WHERE user_id = ?").bind(userId).run();
   await c.env.DB.prepare("DELETE FROM bets WHERE user_id = ?").bind(userId).run();
-  await c.env.DB.prepare("UPDATE users SET referred_by = NULL WHERE referred_by = ?").bind(userId).run();
   const info = await c.env.DB.prepare("DELETE FROM users WHERE id = ?").bind(userId).run();
 
   if (!info.meta.changes) return c.json({ error: "User not found" }, 404);
   return c.json({ ok: true });
-});
-
-// Global, timestamped activity feed across every user (vs. the aggregate /stats numbers).
-admin.get("/transactions", async (c) => {
-  const limit = Math.min(200, Math.max(1, Number(c.req.query("limit")) || 100));
-  const { results } = await c.env.DB.prepare(
-    `SELECT wt.*, u.username
-     FROM wallet_transactions wt
-     JOIN users u ON u.id = wt.user_id
-     ORDER BY wt.id DESC
-     LIMIT ?`
-  ).bind(limit).all();
-  return c.json({ transactions: results });
 });
 
 // Live view into the current round, including the crash point before it happens.
@@ -163,106 +137,6 @@ admin.post("/round/force-crash", async (c) => {
   const stub = c.env.GAME_ROOM.get(id);
   const res = await stub.fetch("https://game-room/admin/force-crash", { method: "POST" });
   return c.json(await res.json());
-});
-
-// ---------- Recharge requests ----------
-
-admin.get("/recharge-requests", async (c) => {
-  const status = c.req.query("status"); // pending | approved | rejected | omitted for all
-  const query = status
-    ? c.env.DB.prepare(
-        `SELECT rr.*, u.username FROM recharge_requests rr JOIN users u ON u.id = rr.user_id
-         WHERE rr.status = ? ORDER BY rr.id DESC LIMIT 100`
-      ).bind(status)
-    : c.env.DB.prepare(
-        `SELECT rr.*, u.username FROM recharge_requests rr JOIN users u ON u.id = rr.user_id
-         ORDER BY rr.id DESC LIMIT 100`
-      );
-  const { results } = await query.all();
-  return c.json({ requests: results });
-});
-
-admin.post("/recharge-requests/:id/approve", async (c) => {
-  const id = Number(c.req.param("id"));
-  const body = await c.req.json().catch(() => ({}));
-  const request = await c.env.DB.prepare("SELECT * FROM recharge_requests WHERE id = ?").bind(id).first();
-  if (!request) return c.json({ error: "Request not found" }, 404);
-  if (request.status !== "pending") return c.json({ error: `Request is already ${request.status}` }, 400);
-
-  // Mark resolved first, guarded on still being pending, so two concurrent
-  // approve/reject clicks can't both succeed against the same request.
-  const claim = await c.env.DB.prepare(
-    "UPDATE recharge_requests SET status = 'approved', admin_note = ?, resolved_by = ?, resolved_at = ? WHERE id = ? AND status = 'pending'"
-  ).bind(body.note || null, c.get("user").id, new Date().toISOString(), id).run();
-  if (!claim.meta.changes) return c.json({ error: "Request was already resolved" }, 400);
-
-  const isWithdrawal = request.type === "withdrawal";
-  const delta = isWithdrawal ? -request.amount : request.amount;
-  const txType = isWithdrawal ? "withdrawal_approved" : "recharge_approved";
-
-  try {
-    const balance = await adjustBalance(c.env.DB, request.user_id, delta, txType, { requestId: id, note: body.note || null });
-    return c.json({ ok: true, balance });
-  } catch (err) {
-    // The balance couldn't actually be adjusted (e.g. a withdrawal request
-    // whose balance has since dropped below the requested amount) — put the
-    // request back to pending rather than leaving it "approved" with no
-    // matching ledger entry.
-    await c.env.DB.prepare(
-      "UPDATE recharge_requests SET status = 'pending', admin_note = NULL, resolved_by = NULL, resolved_at = NULL WHERE id = ?"
-    ).bind(id).run();
-    return c.json({ error: err.message }, 400);
-  }
-});
-
-admin.post("/recharge-requests/:id/reject", async (c) => {
-  const id = Number(c.req.param("id"));
-  const body = await c.req.json().catch(() => ({}));
-  const claim = await c.env.DB.prepare(
-    "UPDATE recharge_requests SET status = 'rejected', admin_note = ?, resolved_by = ?, resolved_at = ? WHERE id = ? AND status = 'pending'"
-  ).bind(body.note || null, c.get("user").id, new Date().toISOString(), id).run();
-  if (!claim.meta.changes) return c.json({ error: "Request not found or already resolved" }, 400);
-  return c.json({ ok: true });
-});
-
-// ---------- Site banner ----------
-const MAX_BANNER_IMAGE_CHARS = 1_500_000; // ~1.1MB image, generous for a small banner graphic
-
-admin.get("/banner", async (c) => {
-  const row = await c.env.DB.prepare("SELECT * FROM banner WHERE id = 1").first();
-  return c.json({
-    enabled: !!(row && row.enabled),
-    title: row?.title || "",
-    message: row?.message || "",
-    imageDataUrl: row?.image_data_url || null,
-  });
-});
-
-admin.post("/banner", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const { title, message, imageDataUrl, enabled } = body;
-
-  if (imageDataUrl && imageDataUrl.length > MAX_BANNER_IMAGE_CHARS) {
-    return c.json({ error: "Image is too large — please use a smaller image" }, 400);
-  }
-  if (imageDataUrl && !/^data:image\/(png|jpeg|jpg|gif|webp);base64,/.test(imageDataUrl)) {
-    return c.json({ error: "Image must be a PNG, JPEG, GIF, or WebP" }, 400);
-  }
-
-  await c.env.DB.prepare(
-    `UPDATE banner SET title = ?, message = ?, image_data_url = COALESCE(?, image_data_url), enabled = ?, updated_at = ? WHERE id = 1`
-  )
-    .bind(title || null, message || null, imageDataUrl || null, enabled ? 1 : 0, new Date().toISOString())
-    .run();
-
-  return c.json({ ok: true });
-});
-
-admin.get("/feedback", async (c) => {
-  const { results } = await c.env.DB.prepare(
-    `SELECT f.*, u.username FROM feedback f JOIN users u ON u.id = f.user_id ORDER BY f.id DESC LIMIT 100`
-  ).all();
-  return c.json({ feedback: results });
 });
 
 export default admin;

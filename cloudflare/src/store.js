@@ -3,8 +3,6 @@ const DEFAULTS = {
   signup_bonus_credits: "1000",
   min_bet: "10",
   max_bet: "10000",
-  referral_bonus_credits: "500",
-  feedback_section_title: "Review & Feedback",
 };
 
 async function getSetting(db, key) {
@@ -71,14 +69,10 @@ function publicUser(u) {
     id: u.id,
     username: u.username,
     email: u.email,
-    phone: u.phone || null,
     balance: u.balance,
     isAdmin: !!u.is_admin,
     isBanned: !!u.is_banned,
-    isVerified: !!u.is_verified,
     createdAt: u.created_at,
-    referralCode: u.referral_code || null,
-    referredBy: u.referred_by || null,
   };
 }
 

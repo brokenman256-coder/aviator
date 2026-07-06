@@ -67,10 +67,8 @@
     const s = await api("/settings");
     document.getElementById("settingHouseEdge").value = s.houseEdgePercent;
     document.getElementById("settingBonus").value = s.signupBonusCredits;
-    document.getElementById("settingReferralBonus").value = s.referralBonusCredits;
     document.getElementById("settingMinBet").value = s.minBet;
     document.getElementById("settingMaxBet").value = s.maxBet;
-    document.getElementById("settingFeedbackTitle").value = s.feedbackSectionTitle;
   }
 
   document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
@@ -80,10 +78,8 @@
         body: JSON.stringify({
           houseEdgePercent: Number(document.getElementById("settingHouseEdge").value),
           signupBonusCredits: Number(document.getElementById("settingBonus").value),
-          referralBonusCredits: Number(document.getElementById("settingReferralBonus").value),
           minBet: Number(document.getElementById("settingMinBet").value),
           maxBet: Number(document.getElementById("settingMaxBet").value),
-          feedbackSectionTitle: document.getElementById("settingFeedbackTitle").value,
         }),
       });
       toast("Settings saved.");
@@ -121,9 +117,7 @@
         <td>${u.id}</td>
         <td>${escapeHtml(u.username)}</td>
         <td>${escapeHtml(u.email)}</td>
-        <td>${escapeHtml(u.phone || "—")}</td>
         <td>${u.balance.toFixed(2)}</td>
-        <td><span class="pill ${u.isVerified ? "ok" : "warn"}">${u.isVerified ? "Verified" : "Pending"}</span></td>
         <td><span class="pill ${u.isBanned ? "bad" : "ok"}">${u.isBanned ? "Banned" : "Active"}</span></td>
         <td><span class="pill ${u.isAdmin ? "warn" : ""}">${u.isAdmin ? "Admin" : "Player"}</span></td>
         <td class="row-actions">
@@ -209,14 +203,6 @@
     document.getElementById("adjustReason").value = "";
     document.getElementById("adjustError").classList.add("hidden");
 
-    const refBox = document.getElementById("userModalReferrals");
-    const parts = [];
-    parts.push(`Referral code: <code>${escapeHtml(data.user.referralCode || "—")}</code>`);
-    if (data.referredUsers.length) {
-      parts.push(`Referred ${data.referredUsers.length} user(s): ${data.referredUsers.map((u) => escapeHtml(u.username)).join(", ")}`);
-    }
-    refBox.innerHTML = parts.join(" &nbsp;·&nbsp; ");
-
     const betsBody = document.getElementById("userModalBets");
     betsBody.innerHTML = data.bets.length
       ? data.bets.map((b) => `
@@ -260,35 +246,6 @@
     }
   }
 
-  async function loadActivity() {
-    const { transactions } = await api("/transactions?limit=100");
-    const tbody = document.getElementById("activityTableBody");
-    tbody.innerHTML = transactions.length
-      ? transactions.map((t) => `
-          <tr>
-            <td>${new Date(t.created_at).toLocaleString()}</td>
-            <td>${escapeHtml(t.username)}</td>
-            <td>${escapeHtml(t.type)}${metaReasonHtml(t)}</td>
-            <td class="tx-amount ${t.amount >= 0 ? "positive" : "negative"}">${t.amount >= 0 ? "+" : ""}${t.amount.toFixed(2)}</td>
-            <td>${t.balance_after.toFixed(2)}</td>
-          </tr>`).join("")
-      : `<tr><td colspan="5" style="color:var(--text-dim);">No activity yet.</td></tr>`;
-  }
-
-  async function loadFeedback() {
-    const { feedback } = await api("/feedback");
-    const tbody = document.getElementById("feedbackTableBody");
-    tbody.innerHTML = feedback.length
-      ? feedback.map((f) => `
-          <tr>
-            <td>${new Date(f.created_at).toLocaleString()}</td>
-            <td>${escapeHtml(f.username)}</td>
-            <td>${"★".repeat(f.rating)}${"☆".repeat(5 - f.rating)}</td>
-            <td>${escapeHtml(f.message || "—")}</td>
-          </tr>`).join("")
-      : `<tr><td colspan="4" style="color:var(--text-dim);">No feedback yet.</td></tr>`;
-  }
-
   function metaReasonHtml(t) {
     if (!t.meta) return "";
     try {
@@ -300,121 +257,20 @@
     return "";
   }
 
-  async function loadRechargeRequests() {
-    const { requests } = await api("/recharge-requests");
-    const tbody = document.getElementById("rechargeTableBody");
-    tbody.innerHTML = requests.length
-      ? requests.map((r) => `
-          <tr>
-            <td>${r.id}</td>
-            <td>${escapeHtml(r.username)}</td>
-            <td><span class="pill ${r.type === "withdrawal" ? "bad" : "ok"}">${r.type === "withdrawal" ? "Withdrawal" : "Recharge"}</span></td>
-            <td>${Number(r.amount).toFixed(2)}</td>
-            <td><span class="pill ${r.status === "pending" ? "warn" : r.status === "approved" ? "ok" : "bad"}">${escapeHtml(r.status)}</span></td>
-            <td>${new Date(r.created_at).toLocaleString()}</td>
-            <td class="row-actions">
-              ${r.status === "pending"
-                ? `<button class="mini-btn" data-action="recharge-approve" data-id="${r.id}">Approve</button>
-                   <button class="mini-btn danger" data-action="recharge-reject" data-id="${r.id}">Reject</button>`
-                : "—"}
-            </td>
-          </tr>`).join("")
-      : `<tr><td colspan="7" style="color:var(--text-dim);">No requests yet.</td></tr>`;
-  }
-
-  document.getElementById("rechargeTableBody").addEventListener("click", async (e) => {
-    const btn = e.target.closest("button.mini-btn");
-    if (!btn) return;
-    const id = btn.dataset.id;
-    try {
-      if (btn.dataset.action === "recharge-approve") {
-        const note = prompt("Note for this approval (optional):", "") || "";
-        await api(`/recharge-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ note }) });
-        toast("Recharge approved.");
-      } else if (btn.dataset.action === "recharge-reject") {
-        const note = prompt("Reason for rejecting (optional):", "") || "";
-        await api(`/recharge-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) });
-        toast("Recharge rejected.");
-      }
-      await Promise.all([loadRechargeRequests(), loadUsers(), loadStats()]);
-    } catch (err) {
-      toast(err.message);
-    }
-  });
-
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     }[c]));
   }
 
-  // ---------- Site banner ----------
-  let pendingBannerImageDataUrl = null;
-
-  async function loadBanner() {
-    const b = await api("/banner");
-    document.getElementById("bannerTitle").value = b.title || "";
-    document.getElementById("bannerMessage").value = b.message || "";
-    document.getElementById("bannerEnabled").checked = !!b.enabled;
-    const preview = document.getElementById("bannerPreview");
-    if (b.imageDataUrl) {
-      preview.src = b.imageDataUrl;
-      preview.style.display = "block";
-    } else {
-      preview.style.display = "none";
-    }
-  }
-
-  document.getElementById("bannerImageInput").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 1_100_000) {
-      toast("Image is too large — please pick a smaller file");
-      e.target.value = "";
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      pendingBannerImageDataUrl = reader.result;
-      const preview = document.getElementById("bannerPreview");
-      preview.src = pendingBannerImageDataUrl;
-      preview.style.display = "block";
-    };
-    reader.readAsDataURL(file);
-  });
-
-  document.getElementById("saveBannerBtn").addEventListener("click", async () => {
-    const errorBox = document.getElementById("bannerError");
-    errorBox.classList.add("hidden");
-    try {
-      await api("/banner", {
-        method: "POST",
-        body: JSON.stringify({
-          title: document.getElementById("bannerTitle").value.trim(),
-          message: document.getElementById("bannerMessage").value.trim(),
-          imageDataUrl: pendingBannerImageDataUrl,
-          enabled: document.getElementById("bannerEnabled").checked,
-        }),
-      });
-      pendingBannerImageDataUrl = null;
-      toast("Banner saved.");
-    } catch (err) {
-      errorBox.textContent = err.message;
-      errorBox.classList.remove("hidden");
-    }
-  });
-
   (async () => {
     const isAdmin = await loadSelf();
     if (!isAdmin) return;
-    await Promise.all([loadStats(), loadSettings(), loadUsers(), loadRounds(), loadActivity(), loadLiveRound(), loadRechargeRequests(), loadBanner(), loadFeedback()]);
+    await Promise.all([loadStats(), loadSettings(), loadUsers(), loadRounds(), loadLiveRound()]);
     setInterval(() => {
       loadStats().catch(() => {});
       loadUsers().catch(() => {});
       loadRounds().catch(() => {});
-      loadActivity().catch(() => {});
-      loadRechargeRequests().catch(() => {});
-      loadFeedback().catch(() => {});
     }, 8000);
     setInterval(() => {
       loadLiveRound().catch(() => {});
