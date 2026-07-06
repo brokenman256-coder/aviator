@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { authRequired } from "./middleware.js";
-import { adjustBalance, publicUser } from "./store.js";
+import { adjustBalance, getNumberSetting, publicUser } from "./store.js";
 
 const wallet = new Hono();
 
@@ -77,9 +77,26 @@ wallet.post("/daily-wheel/spin", authRequired, async (c) => {
 
   await adjustBalance(c.env.DB, user.id, amount, "daily_wheel", { date });
   const streakBonus = streakBonusFor(streak);
-  const balance = await adjustBalance(c.env.DB, user.id, streakBonus, "streak_bonus", { date, streak });
+  let balance = await adjustBalance(c.env.DB, user.id, streakBonus, "streak_bonus", { date, streak });
 
-  return c.json({ index, amount, streak, streakBonus, balance });
+  // First-spin referral payout: paying on first activity (not on signup) keeps
+  // throwaway accounts from farming the bonus. Guarded on referral_rewarded so
+  // it can only ever pay once per invited player.
+  let referralPaid = 0;
+  if (user.referred_by && !user.referral_rewarded) {
+    const claimed = await c.env.DB.prepare(
+      "UPDATE users SET referral_rewarded = 1 WHERE id = ? AND referral_rewarded = 0"
+    ).bind(user.id).run();
+    if (claimed.meta.changes) {
+      referralPaid = await getNumberSetting(c.env.DB, "referral_bonus_credits");
+      if (referralPaid > 0) {
+        balance = await adjustBalance(c.env.DB, user.id, referralPaid, "referral_bonus", { referredBy: user.referred_by });
+        await adjustBalance(c.env.DB, user.referred_by, referralPaid, "referral_bonus", { referredUser: user.id });
+      }
+    }
+  }
+
+  return c.json({ index, amount, streak, streakBonus, referralBonus: referralPaid, balance });
 });
 
 wallet.get("/me", authRequired, async (c) => {
@@ -89,6 +106,29 @@ wallet.get("/me", authRequired, async (c) => {
     .bind(c.get("user").id)
     .all();
   return c.json({ user: publicUser(c.get("user")), transactions: results });
+});
+
+// Invite page data: your code, who you invited (subordinate data), and how
+// many credits you've earned from referrals.
+wallet.get("/referral", authRequired, async (c) => {
+  const user = c.get("user");
+  const { results: invited } = await c.env.DB.prepare(
+    `SELECT id, username, created_at, referral_rewarded FROM users WHERE referred_by = ? ORDER BY id DESC`
+  ).bind(user.id).all();
+  const earned = await c.env.DB.prepare(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM wallet_transactions WHERE user_id = ? AND type = 'referral_bonus'`
+  ).bind(user.id).first();
+  const bonus = await getNumberSetting(c.env.DB, "referral_bonus_credits");
+  return c.json({
+    code: user.referral_code,
+    bonusPerReferral: bonus,
+    invited: invited.map((u) => ({
+      username: u.username,
+      joinedAt: u.created_at,
+      active: !!u.referral_rewarded,
+    })),
+    totalEarned: earned.total,
+  });
 });
 
 wallet.get("/recharge-requests", authRequired, async (c) => {

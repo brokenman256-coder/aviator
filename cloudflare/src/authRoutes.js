@@ -11,9 +11,26 @@ function issueToken(user, secret) {
   return signJwt({ uid: user.id }, secret, 7 * 24 * 60 * 60);
 }
 
+function randomReferralCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I to avoid confusion
+  let code = "";
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  for (const b of bytes) code += alphabet[b % alphabet.length];
+  return code;
+}
+
+async function generateUniqueReferralCode(db) {
+  for (let i = 0; i < 5; i++) {
+    const code = randomReferralCode();
+    const existing = await db.prepare("SELECT id FROM users WHERE referral_code = ?").bind(code).first();
+    if (!existing) return code;
+  }
+  throw new Error("Could not generate a unique referral code, try again");
+}
+
 auth.post("/register", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const { username, email, password } = body;
+  const { username, email, password, referralCode } = body;
   if (!username || !email || !password) {
     return c.json({ error: "username, email, and password are required" }, 400);
   }
@@ -32,13 +49,21 @@ auth.post("/register", async (c) => {
   ).bind(email, username).first();
   if (existing) return c.json({ error: "Username or email is already registered" }, 409);
 
+  let referredBy = null;
+  if (referralCode) {
+    const referrer = await c.env.DB.prepare("SELECT id FROM users WHERE referral_code = ?")
+      .bind(String(referralCode).trim().toUpperCase()).first();
+    if (referrer) referredBy = referrer.id;
+  }
+
   const { hash, salt } = await hashPassword(password);
+  const newReferralCode = await generateUniqueReferralCode(c.env.DB);
   const now = new Date().toISOString();
   const info = await c.env.DB.prepare(
-    `INSERT INTO users (username, email, password_hash, password_salt, is_verified, is_admin, is_banned, balance, created_at)
-     VALUES (?, ?, ?, ?, 1, 0, 0, 0, ?)`
+    `INSERT INTO users (username, email, password_hash, password_salt, is_verified, is_admin, is_banned, balance, created_at, referral_code, referred_by)
+     VALUES (?, ?, ?, ?, 1, 0, 0, 0, ?, ?, ?)`
   )
-    .bind(username, email, hash, salt, now)
+    .bind(username, email, hash, salt, now, newReferralCode, referredBy)
     .run();
 
   const userId = info.meta.last_row_id;

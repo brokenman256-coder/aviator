@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Invite Friends</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon"><svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M2 12L22 2L14 22L11 13L2 12Z"/></svg></span>
+        <span class="brand-name">INVITE</span>
+      </div>
+      <div class="topbar-right">
+        <span id="usernamePill" class="username-pill"></span>
+        <a class="ghost-btn" href="index.html">Back to game</a>
+        <button id="logoutBtn" class="ghost-btn">Log out</button>
+      </div>
+    </header>
+
+    <div class="referral-hero">
+      <div class="referral-hero-stat">
+        <div class="referral-hero-label">Friends invited</div>
+        <div class="referral-hero-value" id="invitedCount">0</div>
+      </div>
+      <div class="referral-hero-stat">
+        <div class="referral-hero-label">Credits earned</div>
+        <div class="referral-hero-value" id="earnedTotal">0</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Your invite link</h2>
+      <div style="font-size:12px; color:var(--text-dim);">
+        Share this link. When a friend signs up and takes their first daily spin, you <strong>both</strong> get
+        <span id="bonusAmt">100</span> credits.
+      </div>
+      <div class="amount-row">
+        <input type="text" id="referralLink" readonly class="amount-input" style="font-weight:400; text-align:left;" />
+        <button id="copyLinkBtn" class="step-btn" style="width:auto; padding:0 14px;">Copy</button>
+      </div>
+      <div class="amount-row">
+        <input type="text" id="referralCode" readonly class="amount-input" style="text-align:left;" />
+        <button id="copyCodeBtn" class="step-btn" style="width:auto; padding:0 14px;">Copy code</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Invited friends</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Player</th><th>Joined</th><th>Status</th></tr></thead>
+          <tbody id="invitedTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>How it works</h2>
+      <ol class="referral-rules">
+        <li>Share your invite link or code with a friend.</li>
+        <li>They sign up using your link.</li>
+        <li>When they take their first daily wheel spin, you both get bonus credits.</li>
+        <li>Invite as many friends as you like — there's no limit.</li>
+      </ol>
+    </div>
+  </div>
+
+  <script src="js/referral.js"></script>
+</body>
+</html>

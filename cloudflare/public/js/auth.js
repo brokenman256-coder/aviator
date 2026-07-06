@@ -18,6 +18,20 @@
     document.getElementById("loginPassword").focus();
   }
 
+  const referralCode = new URLSearchParams(location.search).get("ref");
+  if (referralCode) {
+    tabs.forEach((t) => t.classList.remove("active"));
+    const regTab = document.querySelector('.auth-tab[data-tab="register"]');
+    if (regTab) regTab.classList.add("active");
+    registerForm.classList.remove("section-hidden");
+    loginForm.classList.add("section-hidden");
+    const note = document.getElementById("referralNote");
+    if (note) {
+      note.textContent = `Invited with code ${referralCode.toUpperCase()} — you'll both get bonus credits after your first daily spin.`;
+      note.classList.remove("hidden");
+    }
+  }
+
   function showError(msg) {
     errorBox.textContent = msg;
     errorBox.classList.remove("hidden");
@@ -79,7 +93,7 @@
     const email = document.getElementById("registerEmail").value.trim();
     const password = document.getElementById("registerPassword").value;
     try {
-      const data = await api("/register", { username, email, password });
+      const data = await api("/register", { username, email, password, referralCode });
       onAuthSuccess(data.token, data.user);
     } catch (err) {
       showError(err.message);

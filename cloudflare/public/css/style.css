@@ -750,6 +750,43 @@ th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: 
   font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
 }
 
+/* Referral / invite page */
+.referral-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.referral-hero-stat {
+  background: linear-gradient(160deg, rgba(229, 5, 57, 0.18), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.referral-hero-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+
+.referral-hero-value {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--gold-bright);
+  margin-top: 4px;
+}
+
+.referral-rules {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+
 /* Live bets feed */
 .feed-panel {
   background: var(--panel);
