@@ -71,6 +71,7 @@
 
   async function loadSettings() {
     const s = await api("/settings");
+    document.getElementById("settingSiteName").value = s.siteName || "";
     document.getElementById("settingHouseEdge").value = s.houseEdgePercent;
     document.getElementById("settingBonus").value = s.signupBonusCredits;
     document.getElementById("settingMinBet").value = s.minBet;
@@ -106,6 +107,7 @@
       await api("/settings", {
         method: "POST",
         body: JSON.stringify({
+          siteName: document.getElementById("settingSiteName").value,
           houseEdgePercent: Number(document.getElementById("settingHouseEdge").value),
           signupBonusCredits: Number(document.getElementById("settingBonus").value),
           minBet: Number(document.getElementById("settingMinBet").value),

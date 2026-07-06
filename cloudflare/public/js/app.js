@@ -28,6 +28,18 @@
   }
   document.getElementById("logoutBtn").addEventListener("click", logout);
 
+  // ---------- Branding (admin-set site name) ----------
+  fetch("/api/site-settings")
+    .then((r) => r.json())
+    .then((s) => {
+      if (s.siteName) {
+        const el = document.getElementById("brandName");
+        if (el) el.textContent = s.siteName.toUpperCase();
+        document.title = s.siteName;
+      }
+    })
+    .catch(() => {});
+
   // ---------- Sound ----------
   const sfx = window.sfx || { bet() {}, cancel() {}, cashout() {}, crash() {}, takeoff() {}, isMuted: () => true, toggleMute: () => true };
   const muteBtn = document.getElementById("muteBtn");

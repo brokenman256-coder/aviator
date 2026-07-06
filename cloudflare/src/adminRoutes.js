@@ -53,6 +53,7 @@ admin.get("/settings", async (c) => {
     streakBonusPerDay: Number(await getSetting(c.env.DB, "streak_bonus_per_day")),
     wheelPrizes: await getSetting(c.env.DB, "wheel_prizes"),
     wheelWeights: await getSetting(c.env.DB, "wheel_weights"),
+    siteName: await getSetting(c.env.DB, "site_name"),
   });
 });
 
@@ -68,7 +69,11 @@ function sanitizeCsvNums(str) {
 
 admin.post("/settings", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const { houseEdgePercent, signupBonusCredits, minBet, maxBet, referralBonusCredits, streakBonusPerDay, wheelPrizes, wheelWeights } = body;
+  const { houseEdgePercent, signupBonusCredits, minBet, maxBet, referralBonusCredits, streakBonusPerDay, wheelPrizes, wheelWeights, siteName } = body;
+  if (siteName !== undefined) {
+    const clean = String(siteName).trim().slice(0, 24);
+    if (clean) await setSetting(c.env.DB, "site_name", clean);
+  }
   if (houseEdgePercent !== undefined) {
     await setSetting(c.env.DB, "house_edge_percent", Math.min(50, Math.max(0, Number(houseEdgePercent))));
   }
