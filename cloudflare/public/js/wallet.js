@@ -7,7 +7,8 @@
     return;
   }
 
-  let razorpayConfig = null;
+  let paymentInfo = null;
+  let screenshotFile = null;
 
   function logout() {
     localStorage.removeItem("aviator_token");
@@ -50,25 +51,43 @@
 
   function updateCreditsPreview() {
     const preview = document.getElementById("creditsPreview");
-    if (!razorpayConfig?.configured) return;
-    const amount = Number(document.getElementById("onlinePayAmount").value);
+    if (!paymentInfo) return;
+    const amount = Number(document.getElementById("rechargeAmountInr").value);
     if (!isFinite(amount) || amount <= 0) {
       preview.textContent = "";
       return;
     }
-    const credits = Math.round(amount * razorpayConfig.creditsPerRupee * 100) / 100;
-    preview.textContent = `You'll receive ${credits.toFixed(2)} credits`;
+    const credits = Math.round(amount * paymentInfo.creditsPerRupee * 100) / 100;
+    preview.textContent = `You'll receive ${credits.toFixed(2)} credits after approval`;
   }
 
-  async function loadRazorpayConfig() {
-    const res = await fetch("/api/wallet/razorpay/config", {
+  function renderPaymentDetails() {
+    const box = document.getElementById("paymentDetails");
+    if (!paymentInfo) {
+      box.textContent = "Loading payment details...";
+      return;
+    }
+    const parts = [];
+    if (paymentInfo.upiId) {
+      parts.push(`<strong>UPI ID:</strong> <span style="color:var(--accent-green,#22c55e);">${escapeHtml(paymentInfo.upiId)}</span>`);
+    }
+    if (paymentInfo.instructions) {
+      parts.push(escapeHtml(paymentInfo.instructions));
+    }
+    if (!parts.length) {
+      parts.push("Ask admin to configure payment details in the admin panel.");
+    }
+    box.innerHTML = parts.join("<br>");
+  }
+
+  async function loadPaymentInfo() {
+    const res = await fetch("/api/wallet/payment-info", {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return;
-    razorpayConfig = await res.json();
-    if (!razorpayConfig.configured) {
-      document.getElementById("onlinePayPanel").style.display = "none";
-    }
+    paymentInfo = await res.json();
+    renderPaymentDetails();
+    updateCreditsPreview();
   }
 
   async function load() {
@@ -108,133 +127,156 @@
     const { requests } = await res.json();
     const tbody = document.getElementById("rechargeTableBody");
     tbody.innerHTML = requests.length
-      ? requests.map((r) => `
+      ? requests.map((r) => {
+          const amountLabel = r.type === "withdrawal"
+            ? `${Number(r.amount).toFixed(2)} credits`
+            : r.amount_inr
+              ? `₹${Number(r.amount_inr).toFixed(0)} → ${Number(r.amount).toFixed(2)} cr`
+              : `${Number(r.amount).toFixed(2)} credits`;
+          const proofBtn = r.hasScreenshot
+            ? `<button class="mini-btn" data-view-proof="${r.id}">View</button>`
+            : "";
+          return `
           <tr>
             <td>${new Date(r.created_at).toLocaleString()}</td>
             <td>${r.type === "withdrawal" ? "Withdrawal" : "Add funds"}</td>
-            <td>${Number(r.amount).toFixed(2)}</td>
+            <td>${amountLabel}</td>
             <td><span class="pill ${STATUS_PILL[r.status] || ""}">${escapeHtml(r.status)}</span></td>
-          </tr>`).join("")
-      : `<tr><td colspan="4" style="color:var(--text-dim);">No requests yet.</td></tr>`;
+            <td>${proofBtn}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="5" style="color:var(--text-dim);">No requests yet.</td></tr>`;
   }
 
-  async function submitFundRequest(type, amountInputId, errorBoxId) {
-    hideError(errorBoxId);
-    const amountInput = document.getElementById(amountInputId);
-    const amount = Number(amountInput.value);
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const base64 = result.includes(",") ? result.split(",")[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error("Could not read image"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  document.getElementById("screenshotInput").addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    screenshotFile = file || null;
+    const preview = document.getElementById("screenshotPreview");
+    if (!file) {
+      preview.classList.add("hidden");
+      preview.innerHTML = "";
+      return;
+    }
+    if (file.size > 1.5 * 1024 * 1024) {
+      showError("rechargeError", "Screenshot must be under 1.5 MB");
+      e.target.value = "";
+      screenshotFile = null;
+      preview.classList.add("hidden");
+      return;
+    }
+    hideError("rechargeError");
+    const url = URL.createObjectURL(file);
+    preview.innerHTML = `<img src="${url}" alt="Preview" style="max-width:100%; max-height:160px; border-radius:8px; margin-top:8px;" />`;
+    preview.classList.remove("hidden");
+  });
+
+  async function submitRecharge() {
+    hideError("rechargeError");
+    const amountInr = Number(document.getElementById("rechargeAmountInr").value);
+    if (!isFinite(amountInr) || amountInr < (paymentInfo?.minAmountInr || 10)) {
+      showError("rechargeError", `Minimum payment is ₹${paymentInfo?.minAmountInr || 10}`);
+      return;
+    }
+    if (!screenshotFile) {
+      showError("rechargeError", "Upload a payment screenshot");
+      return;
+    }
+
+    const btn = document.getElementById("submitRechargeBtn");
+    btn.disabled = true;
+    btn.textContent = "Submitting...";
+
+    try {
+      const screenshot = await readFileAsBase64(screenshotFile);
+      const res = await fetch("/api/wallet/recharge-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          type: "recharge",
+          amountInr,
+          paymentReference: document.getElementById("paymentReference").value.trim(),
+          screenshot,
+          screenshotMime: screenshotFile.type,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Request failed");
+
+      document.getElementById("rechargeAmountInr").value = "";
+      document.getElementById("paymentReference").value = "";
+      document.getElementById("screenshotInput").value = "";
+      screenshotFile = null;
+      document.getElementById("screenshotPreview").classList.add("hidden");
+      document.getElementById("screenshotPreview").innerHTML = "";
+      updateCreditsPreview();
+      await loadRechargeRequests();
+      btn.textContent = "Submitted!";
+      setTimeout(() => { btn.textContent = "Submit payment proof"; }, 2000);
+    } catch (err) {
+      showError("rechargeError", err.message);
+      btn.textContent = "Submit payment proof";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function submitWithdraw() {
+    hideError("withdrawError");
+    const amount = Number(document.getElementById("withdrawAmount").value);
     if (!isFinite(amount) || amount <= 0) {
-      showError(errorBoxId, "Enter a valid amount");
+      showError("withdrawError", "Enter a valid amount");
       return;
     }
     try {
       const res = await fetch("/api/wallet/recharge-request", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amount, type }),
+        body: JSON.stringify({ amount, type: "withdrawal" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
-      amountInput.value = "";
+      document.getElementById("withdrawAmount").value = "";
       await loadRechargeRequests();
     } catch (err) {
-      showError(errorBoxId, err.message);
+      showError("withdrawError", err.message);
     }
   }
 
-  async function payOnline() {
-    hideError("onlinePayError");
-    if (!razorpayConfig?.configured) {
-      showError("onlinePayError", "Online payments are not available");
-      return;
-    }
-    if (typeof Razorpay === "undefined") {
-      showError("onlinePayError", "Payment gateway is still loading");
-      return;
-    }
+  const screenshotModal = document.getElementById("screenshotModal");
+  document.getElementById("closeScreenshotModal").addEventListener("click", () => screenshotModal.classList.add("hidden"));
+  screenshotModal.addEventListener("click", (e) => { if (e.target === screenshotModal) screenshotModal.classList.add("hidden"); });
 
-    const amountInr = Number(document.getElementById("onlinePayAmount").value);
-    if (!isFinite(amountInr) || amountInr < 10) {
-      showError("onlinePayError", "Minimum payment is ₹10");
-      return;
-    }
-
-    const btn = document.getElementById("payOnlineBtn");
-    btn.disabled = true;
-    btn.textContent = "Opening...";
-
-    try {
-      const orderRes = await fetch("/api/wallet/razorpay/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amountInr }),
-      });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error || "Could not start payment");
-
-      const meRes = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
-      let username = "";
-      let email = "";
-      if (meRes?.ok) {
-        const meData = await meRes.json();
-        username = meData.user?.username || "";
-        email = meData.user?.email || "";
-      }
-
-      const rzp = new Razorpay({
-        key: orderData.keyId,
-        amount: orderData.amountPaise,
-        currency: "INR",
-        name: "SkyDash",
-        description: `Add ${orderData.creditsToAdd} credits`,
-        order_id: orderData.razorpayOrderId,
-        prefill: { name: username, email },
-        theme: { color: "#22c55e" },
-        handler: async (response) => {
-          const verifyRes = await fetch("/api/wallet/razorpay/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
-          const verifyData = await verifyRes.json();
-          if (!verifyRes.ok) {
-            showError("onlinePayError", verifyData.error || "Payment verification failed");
-            return;
-          }
-          document.getElementById("onlinePayAmount").value = "";
-          updateCreditsPreview();
-          await load();
-        },
-      });
-
-      rzp.on("payment.failed", (response) => {
-        showError("onlinePayError", response.error?.description || "Payment failed");
-      });
-
-      rzp.open();
-    } catch (err) {
-      showError("onlinePayError", err.message);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Pay now";
-    }
-  }
-
-  document.getElementById("submitRechargeBtn").addEventListener("click", () => {
-    submitFundRequest("recharge", "rechargeAmount", "rechargeError");
+  document.getElementById("rechargeTableBody").addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-view-proof]");
+    if (!btn) return;
+    const id = btn.dataset.viewProof;
+    const res = await fetch(`/api/wallet/recharge-requests/${id}/screenshot`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return;
+    const { mimeType, data } = await res.json();
+    document.getElementById("screenshotModalImg").src = `data:${mimeType};base64,${data}`;
+    screenshotModal.classList.remove("hidden");
   });
 
-  document.getElementById("submitWithdrawBtn").addEventListener("click", () => {
-    submitFundRequest("withdrawal", "withdrawAmount", "withdrawError");
-  });
+  document.getElementById("submitRechargeBtn").addEventListener("click", submitRecharge);
+  document.getElementById("submitWithdrawBtn").addEventListener("click", submitWithdraw);
+  document.getElementById("rechargeAmountInr").addEventListener("input", updateCreditsPreview);
 
-  document.getElementById("payOnlineBtn").addEventListener("click", payOnline);
-  document.getElementById("onlinePayAmount").addEventListener("input", updateCreditsPreview);
-
-  loadRazorpayConfig().then(updateCreditsPreview);
+  loadPaymentInfo();
   load();
   loadRechargeRequests();
 })();

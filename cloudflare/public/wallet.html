@@ -6,7 +6,6 @@
 <title>SkyDash — Wallet</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="stylesheet" href="css/style.css" />
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
   <div class="app">
@@ -30,29 +29,28 @@
       </div>
     </div>
 
-    <div class="panel" id="onlinePayPanel">
-      <h2>Pay Online (Instant)</h2>
-      <div style="font-size:12px; color:var(--text-dim);">
-        Pay with UPI, card, or netbanking. Credits are added to your balance immediately after payment.
-      </div>
-      <div class="error-box hidden" id="onlinePayError"></div>
-      <div class="amount-row">
-        <input type="number" id="onlinePayAmount" class="amount-input" min="10" step="1" placeholder="Amount in ₹" style="text-align:left;" />
-        <button id="payOnlineBtn" class="step-btn" style="width:auto; padding:0 14px; background:var(--accent-green, #22c55e);">Pay now</button>
-      </div>
-      <div id="creditsPreview" style="font-size:12px; color:var(--text-dim); margin-top:8px;"></div>
-    </div>
-
     <div class="panel">
-      <h2>Add Funds (Manual)</h2>
+      <h2>Add Funds</h2>
+      <div id="paymentDetails" class="payment-details-box" style="font-size:12px; color:var(--text-dim); margin-bottom:12px;"></div>
       <div style="font-size:12px; color:var(--text-dim);">
-        Request credits to be added to your balance. Your request stays pending until an admin approves or rejects it.
+        Step 1: Pay the amount below via UPI/bank. Step 2: Upload your payment screenshot. Step 3: Wait for admin approval.
       </div>
       <div class="error-box hidden" id="rechargeError"></div>
-      <div class="amount-row">
-        <input type="number" id="rechargeAmount" class="amount-input" min="1" step="1" placeholder="Amount" style="text-align:left;" />
-        <button id="submitRechargeBtn" class="step-btn" style="width:auto; padding:0 14px;">Request</button>
+      <div class="field" style="margin-top:10px;">
+        <label style="font-size:12px; color:var(--text-dim);">Amount paid (₹)</label>
+        <input type="number" id="rechargeAmountInr" class="amount-input" min="10" step="1" placeholder="e.g. 500" style="text-align:left; width:100%;" />
       </div>
+      <div id="creditsPreview" style="font-size:12px; color:var(--text-dim); margin:6px 0 10px;"></div>
+      <div class="field">
+        <label style="font-size:12px; color:var(--text-dim);">UPI / transaction reference (optional)</label>
+        <input type="text" id="paymentReference" class="amount-input" maxlength="64" placeholder="e.g. UPI txn ID" style="text-align:left; width:100%;" />
+      </div>
+      <div class="field">
+        <label style="font-size:12px; color:var(--text-dim);">Payment screenshot (required)</label>
+        <input type="file" id="screenshotInput" accept="image/jpeg,image/png,image/webp" />
+        <div id="screenshotPreview" class="screenshot-preview hidden"></div>
+      </div>
+      <button id="submitRechargeBtn" class="step-btn" style="width:100%; padding:12px; margin-top:8px;">Submit payment proof</button>
     </div>
 
     <div class="panel">
@@ -62,7 +60,7 @@
       </div>
       <div class="error-box hidden" id="withdrawError"></div>
       <div class="amount-row">
-        <input type="number" id="withdrawAmount" class="amount-input" min="1" step="1" placeholder="Amount" style="text-align:left;" />
+        <input type="number" id="withdrawAmount" class="amount-input" min="1" step="1" placeholder="Credits to withdraw" style="text-align:left;" />
         <button id="submitWithdrawBtn" class="step-btn" style="width:auto; padding:0 14px;">Request</button>
       </div>
     </div>
@@ -71,7 +69,7 @@
       <h2>Fund Request History</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead>
+          <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Status</th><th></th></tr></thead>
           <tbody id="rechargeTableBody"></tbody>
         </table>
       </div>
@@ -86,6 +84,18 @@
           </thead>
           <tbody id="txTableBody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="screenshotModal" class="modal hidden">
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-header">
+        <span>Payment screenshot</span>
+        <button id="closeScreenshotModal" class="ghost-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <img id="screenshotModalImg" alt="Payment screenshot" style="max-width:100%; border-radius:8px;" />
       </div>
     </div>
   </div>
