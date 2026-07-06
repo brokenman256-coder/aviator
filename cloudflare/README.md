@@ -18,37 +18,24 @@ Copy the `database_id` it prints into `wrangler.toml` (replacing
 
 ```
 npx wrangler d1 execute aviator-db --remote --file=./migrations/0001_init.sql
-# Run any other migrations in order (0002, 0003, ... 0010_razorpay_orders.sql)
+# Run migrations in order through 0011_payment_screenshots.sql
 npx wrangler secret put JWT_SECRET   # paste a long random string when prompted
 node seed-admin.mjs "admin@aviator.local" "admin" "your-password" > seed.sql
 npx wrangler d1 execute aviator-db --remote --file=./seed.sql
 npx wrangler deploy
 ```
 
-## Online payments (Razorpay)
+## Manual payments (screenshot + admin approval)
 
-To let players add credits instantly via UPI/card/netbanking:
+Players add funds by paying via UPI/bank, uploading a payment screenshot, and
+waiting for admin approval. No third-party payment gateway required.
 
-1. Create a [Razorpay](https://dashboard.razorpay.com) account and get your API keys.
-2. Set secrets on your Worker:
-   ```
-   npx wrangler secret put RAZORPAY_KEY_ID
-   npx wrangler secret put RAZORPAY_KEY_SECRET
-   npx wrangler secret put RAZORPAY_WEBHOOK_SECRET   # optional but recommended
-   ```
-3. Run the Razorpay migration:
-   ```
-   npx wrangler d1 execute aviator-db --remote --file=./migrations/0010_razorpay_orders.sql
-   ```
-4. (Optional) In the Razorpay dashboard, add a webhook pointing to:
-   `https://your-worker.workers.dev/api/wallet/razorpay/webhook`
-   with the `payment.captured` event.
+1. Run migration `0011_payment_screenshots.sql` if not already applied.
+2. In the **Admin panel → Payment Details**, set your UPI ID and instructions.
+3. Set **Credits per ₹** in Game Settings (default 1 credit per rupee).
 
-Players see a **Pay Online** section on the Wallet page. Credits are added
-immediately after payment. The conversion rate (credits per ₹) is configurable
-from the admin panel (`credits_per_rupee`, default 1).
-
-Use Razorpay **test keys** while developing; switch to live keys in production.
+Players see payment details on the Wallet page, submit amount + screenshot, and
+credits are added when an admin approves the request.
 
 ## Local dev
 
@@ -61,8 +48,6 @@ npx wrangler dev
 
 ```
 JWT_SECRET=anything-for-local-dev
-RAZORPAY_KEY_ID=rzp_test_...
-RAZORPAY_KEY_SECRET=your_test_secret
 ```
 
 ## Differences from the `server/` (Node) build
