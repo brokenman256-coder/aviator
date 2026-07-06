@@ -49,11 +49,26 @@ admin.get("/settings", async (c) => {
     signupBonusCredits: Number(await getSetting(c.env.DB, "signup_bonus_credits")),
     minBet: Number(await getSetting(c.env.DB, "min_bet")),
     maxBet: Number(await getSetting(c.env.DB, "max_bet")),
+    referralBonusCredits: Number(await getSetting(c.env.DB, "referral_bonus_credits")),
+    streakBonusPerDay: Number(await getSetting(c.env.DB, "streak_bonus_per_day")),
+    wheelPrizes: await getSetting(c.env.DB, "wheel_prizes"),
+    wheelWeights: await getSetting(c.env.DB, "wheel_weights"),
   });
 });
 
+// Keeps a comma-separated list of non-negative numbers, dropping junk. Used to
+// sanitize the admin-entered wheel prizes / weights before they're stored.
+function sanitizeCsvNums(str) {
+  return String(str || "")
+    .split(",")
+    .map((x) => Number(x.trim()))
+    .filter((n) => isFinite(n) && n >= 0)
+    .join(",");
+}
+
 admin.post("/settings", async (c) => {
-  const { houseEdgePercent, signupBonusCredits, minBet, maxBet } = await c.req.json().catch(() => ({}));
+  const body = await c.req.json().catch(() => ({}));
+  const { houseEdgePercent, signupBonusCredits, minBet, maxBet, referralBonusCredits, streakBonusPerDay, wheelPrizes, wheelWeights } = body;
   if (houseEdgePercent !== undefined) {
     await setSetting(c.env.DB, "house_edge_percent", Math.min(50, Math.max(0, Number(houseEdgePercent))));
   }
@@ -62,6 +77,20 @@ admin.post("/settings", async (c) => {
   }
   if (minBet !== undefined) await setSetting(c.env.DB, "min_bet", Math.max(1, Number(minBet)));
   if (maxBet !== undefined) await setSetting(c.env.DB, "max_bet", Math.max(1, Number(maxBet)));
+  if (referralBonusCredits !== undefined) {
+    await setSetting(c.env.DB, "referral_bonus_credits", Math.max(0, Number(referralBonusCredits)));
+  }
+  if (streakBonusPerDay !== undefined) {
+    await setSetting(c.env.DB, "streak_bonus_per_day", Math.max(0, Number(streakBonusPerDay)));
+  }
+  if (wheelPrizes !== undefined) {
+    const clean = sanitizeCsvNums(wheelPrizes);
+    if (clean) await setSetting(c.env.DB, "wheel_prizes", clean);
+  }
+  if (wheelWeights !== undefined) {
+    const clean = sanitizeCsvNums(wheelWeights);
+    if (clean) await setSetting(c.env.DB, "wheel_weights", clean);
+  }
   return c.json({ ok: true });
 });
 
@@ -78,11 +107,30 @@ admin.get("/stats", async (c) => {
   const userCount = (await c.env.DB.prepare("SELECT COUNT(*) AS c FROM users").first()).c;
   const roundCount = (await c.env.DB.prepare("SELECT COUNT(*) AS c FROM rounds WHERE ended_at IS NOT NULL").first()).c;
 
+  // Reward payouts (credits handed out, separate from bet flow) so the admin can
+  // see how much the wheel / streak / referral programs are costing the house.
+  const rewards = await c.env.DB.prepare(
+    `SELECT
+      COALESCE(SUM(CASE WHEN type = 'daily_wheel' THEN amount ELSE 0 END), 0) AS wheelPaid,
+      COALESCE(SUM(CASE WHEN type = 'streak_bonus' THEN amount ELSE 0 END), 0) AS streakPaid,
+      COALESCE(SUM(CASE WHEN type = 'referral_bonus' THEN amount ELSE 0 END), 0) AS referralPaid
+    FROM wallet_transactions`
+  ).first();
+  const spinsToday = (await c.env.DB.prepare(
+    "SELECT COUNT(*) AS c FROM daily_bonus_claims WHERE claim_date = ?"
+  ).bind(new Date().toISOString().slice(0, 10)).first()).c;
+
   return c.json({
     ...totals,
     houseProfit: Math.round((totals.wagered - totals.paidOut) * 100) / 100,
     userCount,
     roundCount,
+    rewards: {
+      wheelPaid: Math.round(rewards.wheelPaid * 100) / 100,
+      streakPaid: Math.round(rewards.streakPaid * 100) / 100,
+      referralPaid: Math.round(rewards.referralPaid * 100) / 100,
+      spinsToday,
+    },
   });
 });
 

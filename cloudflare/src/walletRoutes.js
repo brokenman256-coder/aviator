@@ -1,24 +1,37 @@
 import { Hono } from "hono";
 import { authRequired } from "./middleware.js";
-import { adjustBalance, getNumberSetting, publicUser } from "./store.js";
+import { adjustBalance, getNumberSetting, getSetting, publicUser } from "./store.js";
 
 const wallet = new Hono();
 
-// Prizes on the daily spin wheel, in wheel-segment order.
-const WHEEL_PRIZES = [100, 50, 20, 30, 40, 500];
-// Odds per segment (same order). The wheel shows six equal slices, but the big
-// 500 is deliberately a ~1% rare jackpot and the small amounts dominate, so the
-// average daily payout stays low and the house stays in profit — it's a prize
-// wheel, not a handout. Average payout ≈ 40 credits/spin.
-const WHEEL_WEIGHTS = [14, 24, 70, 50, 40, 2]; // 100, 50, 20, 30, 40, 500 → total 200
+const DEFAULT_PRIZES = [100, 50, 20, 30, 40, 500];
+const DEFAULT_WEIGHTS = [14, 24, 70, 50, 40, 2];
 
-function pickWeightedIndex() {
-  const total = WHEEL_WEIGHTS.reduce((a, b) => a + b, 0);
+function parseCsvNums(str, fallback) {
+  const nums = String(str || "")
+    .split(",")
+    .map((x) => Number(x.trim()))
+    .filter((n) => isFinite(n) && n >= 0);
+  return nums.length ? nums : fallback.slice();
+}
+
+// The wheel prizes and their odds are admin-configurable (settings). The wheel
+// shows equal slices, but weights let the admin keep big prizes rare so the
+// average payout stays low and the house stays in profit.
+async function loadWheel(db) {
+  const prizes = parseCsvNums(await getSetting(db, "wheel_prizes"), DEFAULT_PRIZES);
+  let weights = parseCsvNums(await getSetting(db, "wheel_weights"), DEFAULT_WEIGHTS);
+  if (weights.length !== prizes.length) weights = prizes.map(() => 1);
+  return { prizes, weights };
+}
+
+function pickWeightedIndex(weights) {
+  const total = weights.reduce((a, b) => a + b, 0) || weights.length;
   let r = Math.random() * total;
-  for (let i = 0; i < WHEEL_WEIGHTS.length; i++) {
-    if ((r -= WHEEL_WEIGHTS[i]) < 0) return i;
+  for (let i = 0; i < weights.length; i++) {
+    if ((r -= weights[i]) < 0) return i;
   }
-  return WHEEL_WEIGHTS.length - 1;
+  return weights.length - 1;
 }
 
 function todayKey() {
@@ -31,21 +44,17 @@ function dayKeyOffset(days) {
   return d.toISOString().slice(0, 10);
 }
 
-// Streak bonus grows with the run of consecutive days, capped so it stays modest.
-function streakBonusFor(streak) {
-  return Math.min(streak, 7) * 10;
-}
-
 // Whether the player has already spun today, plus the wheel layout and streak.
 wallet.get("/daily-wheel", authRequired, async (c) => {
   const user = c.get("user");
+  const { prizes } = await loadWheel(c.env.DB);
   const claim = await c.env.DB.prepare(
     "SELECT amount FROM daily_bonus_claims WHERE user_id = ? AND claim_date = ?"
   ).bind(user.id, todayKey()).first();
   // A streak only still counts if the last spin was today or yesterday.
   const stillValid = user.last_spin_date === todayKey() || user.last_spin_date === dayKeyOffset(-1);
   return c.json({
-    prizes: WHEEL_PRIZES,
+    prizes,
     claimedToday: !!claim,
     claimedAmount: claim ? claim.amount : null,
     streak: stillValid ? user.daily_streak : 0,
@@ -55,8 +64,9 @@ wallet.get("/daily-wheel", authRequired, async (c) => {
 wallet.post("/daily-wheel/spin", authRequired, async (c) => {
   const user = c.get("user");
   const date = todayKey();
-  const index = pickWeightedIndex();
-  const amount = WHEEL_PRIZES[index];
+  const { prizes, weights } = await loadWheel(c.env.DB);
+  const index = pickWeightedIndex(weights);
+  const amount = prizes[index];
   const now = new Date().toISOString();
 
   // The unique (user_id, claim_date) index makes this the atomic gate: only the
@@ -76,7 +86,8 @@ wallet.post("/daily-wheel/spin", authRequired, async (c) => {
   ).bind(streak, date, user.id).run();
 
   await adjustBalance(c.env.DB, user.id, amount, "daily_wheel", { date });
-  const streakBonus = streakBonusFor(streak);
+  const perDay = await getNumberSetting(c.env.DB, "streak_bonus_per_day");
+  const streakBonus = Math.min(streak, 7) * (isFinite(perDay) ? perDay : 10);
   let balance = await adjustBalance(c.env.DB, user.id, streakBonus, "streak_bonus", { date, streak });
 
   // First-spin referral payout: paying on first activity (not on signup) keeps

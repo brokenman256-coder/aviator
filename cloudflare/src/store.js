@@ -4,6 +4,9 @@ const DEFAULTS = {
   min_bet: "10",
   max_bet: "10000",
   referral_bonus_credits: "100",
+  streak_bonus_per_day: "10",
+  wheel_prizes: "100,50,20,30,40,500",
+  wheel_weights: "14,24,70,50,40,2",
 };
 
 async function getSetting(db, key) {

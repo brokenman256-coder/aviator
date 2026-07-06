@@ -64,8 +64,42 @@
             <label>Max bet</label>
             <input type="number" id="settingMaxBet" min="1" step="1" />
           </div>
+          <div class="field">
+            <label>Referral bonus (each side)</label>
+            <input type="number" id="settingReferralBonus" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label>Streak bonus / day</label>
+            <input type="number" id="settingStreakPerDay" min="0" step="1" />
+          </div>
         </div>
         <button id="saveSettingsBtn" class="primary-btn" style="width:fit-content; padding:9px 20px;">Save Settings</button>
+      </div>
+
+      <div class="panel">
+        <h2>Daily Wheel <span style="color:var(--text-dim); font-size:11px; text-transform:none; font-family:inherit;">(prizes & odds — keep the average low to stay in profit)</span></h2>
+        <div class="settings-grid">
+          <div class="field">
+            <label>Prizes (comma-separated)</label>
+            <input type="text" id="settingWheelPrizes" placeholder="100,50,20,30,40,500" />
+          </div>
+          <div class="field">
+            <label>Weights (odds, same order)</label>
+            <input type="text" id="settingWheelWeights" placeholder="14,24,70,50,40,2" />
+          </div>
+        </div>
+        <div id="wheelAvg" style="font-size:12px; color:var(--text-dim);"></div>
+        <button id="saveWheelBtn" class="primary-btn" style="width:fit-content; padding:9px 20px;">Save Wheel</button>
+      </div>
+
+      <div class="panel">
+        <h2>Reward Payouts <span style="color:var(--text-dim); font-size:11px; text-transform:none; font-family:inherit;">(free credits handed out)</span></h2>
+        <div class="admin-grid">
+          <div class="stat-card"><div class="stat-label">Wheel paid</div><div class="stat-value" id="statWheelPaid" style="font-size:18px;">—</div></div>
+          <div class="stat-card"><div class="stat-label">Streak paid</div><div class="stat-value" id="statStreakPaid" style="font-size:18px;">—</div></div>
+          <div class="stat-card"><div class="stat-label">Referral paid</div><div class="stat-value" id="statReferralPaid" style="font-size:18px;">—</div></div>
+          <div class="stat-card"><div class="stat-label">Spins today</div><div class="stat-value" id="statSpinsToday" style="font-size:18px;">—</div></div>
+        </div>
       </div>
 
       <div class="panel">

@@ -61,6 +61,12 @@
     profitEl.textContent = s.houseProfit.toFixed(2);
     profitEl.classList.toggle("positive", s.houseProfit >= 0);
     profitEl.classList.toggle("negative", s.houseProfit < 0);
+    if (s.rewards) {
+      document.getElementById("statWheelPaid").textContent = s.rewards.wheelPaid.toFixed(0);
+      document.getElementById("statStreakPaid").textContent = s.rewards.streakPaid.toFixed(0);
+      document.getElementById("statReferralPaid").textContent = s.rewards.referralPaid.toFixed(0);
+      document.getElementById("statSpinsToday").textContent = s.rewards.spinsToday;
+    }
   }
 
   async function loadSettings() {
@@ -69,7 +75,31 @@
     document.getElementById("settingBonus").value = s.signupBonusCredits;
     document.getElementById("settingMinBet").value = s.minBet;
     document.getElementById("settingMaxBet").value = s.maxBet;
+    document.getElementById("settingReferralBonus").value = s.referralBonusCredits;
+    document.getElementById("settingStreakPerDay").value = s.streakBonusPerDay;
+    document.getElementById("settingWheelPrizes").value = s.wheelPrizes;
+    document.getElementById("settingWheelWeights").value = s.wheelWeights;
+    updateWheelAvg();
   }
+
+  // Shows the expected average payout per spin from the current prizes/weights,
+  // so the admin can see at a glance whether the wheel is too generous.
+  function updateWheelAvg() {
+    const prizes = document.getElementById("settingWheelPrizes").value.split(",").map((n) => Number(n.trim())).filter((n) => isFinite(n));
+    const weights = document.getElementById("settingWheelWeights").value.split(",").map((n) => Number(n.trim())).filter((n) => isFinite(n));
+    const box = document.getElementById("wheelAvg");
+    if (!prizes.length || prizes.length !== weights.length) {
+      box.textContent = "Enter the same number of prizes and weights to preview the average.";
+      return;
+    }
+    const total = weights.reduce((a, b) => a + b, 0) || 1;
+    const avg = prizes.reduce((sum, p, i) => sum + p * weights[i], 0) / total;
+    const jackpot = Math.max(...prizes);
+    const ji = prizes.indexOf(jackpot);
+    box.textContent = `Average payout ≈ ${avg.toFixed(1)} credits/spin · ${jackpot} lands ${((weights[ji] / total) * 100).toFixed(1)}% of spins.`;
+  }
+  document.getElementById("settingWheelPrizes").addEventListener("input", updateWheelAvg);
+  document.getElementById("settingWheelWeights").addEventListener("input", updateWheelAvg);
 
   document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
     try {
@@ -80,9 +110,26 @@
           signupBonusCredits: Number(document.getElementById("settingBonus").value),
           minBet: Number(document.getElementById("settingMinBet").value),
           maxBet: Number(document.getElementById("settingMaxBet").value),
+          referralBonusCredits: Number(document.getElementById("settingReferralBonus").value),
+          streakBonusPerDay: Number(document.getElementById("settingStreakPerDay").value),
         }),
       });
       toast("Settings saved.");
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  document.getElementById("saveWheelBtn").addEventListener("click", async () => {
+    try {
+      await api("/settings", {
+        method: "POST",
+        body: JSON.stringify({
+          wheelPrizes: document.getElementById("settingWheelPrizes").value,
+          wheelWeights: document.getElementById("settingWheelWeights").value,
+        }),
+      });
+      toast("Wheel saved.");
     } catch (err) {
       toast(err.message);
     }
