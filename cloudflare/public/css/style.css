@@ -750,6 +750,66 @@ th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: 
   font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
 }
 
+/* Leaderboard */
+.lb-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  border-radius: 16px;
+  padding: 7px 0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lb-tab.active { background: var(--bg-1); color: var(--text); }
+
+.lb-list { display: flex; flex-direction: column; gap: 5px; }
+
+.lb-row {
+  display: grid;
+  grid-template-columns: 34px 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+.lb-row.lb-mine { border-color: var(--gold); }
+.lb-rank { font-weight: 800; text-align: center; color: var(--text-dim); }
+.lb-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-value { font-weight: 800; }
+
+/* Profile */
+.profile-head { flex-direction: row; align-items: center; gap: 14px; }
+.profile-avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 800; color: #fff; flex: 0 0 auto;
+}
+#statsGrid { grid-template-columns: repeat(2, 1fr); }
+.profile-name { font-size: 22px; font-weight: 800; }
+.profile-meta { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.badge {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+.badge.locked { opacity: 0.38; filter: grayscale(1); }
+.badge.earned { border-color: var(--gold); box-shadow: 0 0 10px rgba(255, 45, 85, 0.2); }
+.badge-icon { font-size: 30px; }
+.badge-name { font-weight: 700; font-size: 13px; margin-top: 4px; }
+.badge-desc { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
 /* Referral / invite page */
 .referral-hero {
   display: grid;

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Profile</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon"><svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M2 12L22 2L14 22L11 13L2 12Z"/></svg></span>
+        <span class="brand-name">PROFILE</span>
+      </div>
+      <div class="topbar-right">
+        <span id="usernamePill" class="username-pill"></span>
+        <a class="ghost-btn" href="leaderboard.html">Leaders</a>
+        <a class="ghost-btn" href="index.html">Back to game</a>
+        <button id="logoutBtn" class="ghost-btn">Log out</button>
+      </div>
+    </header>
+
+    <div class="panel profile-head">
+      <span id="profileAvatar" class="profile-avatar">?</span>
+      <div>
+        <div id="profileName" class="profile-name">—</div>
+        <div id="profileMeta" class="profile-meta"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Stats</h2>
+      <div class="stats-grid" id="statsGrid"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Achievements <span id="badgeProgress" style="color:var(--text-dim); font-size:12px; font-family:inherit; text-transform:none;"></span></h2>
+      <div class="badge-grid" id="badgeGrid"></div>
+    </div>
+  </div>
+
+  <script src="js/profile.js"></script>
+</body>
+</html>
