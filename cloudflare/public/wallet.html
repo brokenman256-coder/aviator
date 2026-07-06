@@ -6,6 +6,7 @@
 <title>SkyDash — Wallet</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="stylesheet" href="css/style.css" />
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
   <div class="app">
@@ -29,8 +30,21 @@
       </div>
     </div>
 
+    <div class="panel" id="onlinePayPanel">
+      <h2>Pay Online (Instant)</h2>
+      <div style="font-size:12px; color:var(--text-dim);">
+        Pay with UPI, card, or netbanking. Credits are added to your balance immediately after payment.
+      </div>
+      <div class="error-box hidden" id="onlinePayError"></div>
+      <div class="amount-row">
+        <input type="number" id="onlinePayAmount" class="amount-input" min="10" step="1" placeholder="Amount in ₹" style="text-align:left;" />
+        <button id="payOnlineBtn" class="step-btn" style="width:auto; padding:0 14px; background:var(--accent-green, #22c55e);">Pay now</button>
+      </div>
+      <div id="creditsPreview" style="font-size:12px; color:var(--text-dim); margin-top:8px;"></div>
+    </div>
+
     <div class="panel">
-      <h2>Add Funds</h2>
+      <h2>Add Funds (Manual)</h2>
       <div style="font-size:12px; color:var(--text-dim);">
         Request credits to be added to your balance. Your request stays pending until an admin approves or rejects it.
       </div>

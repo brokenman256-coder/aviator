@@ -18,11 +18,37 @@ Copy the `database_id` it prints into `wrangler.toml` (replacing
 
 ```
 npx wrangler d1 execute aviator-db --remote --file=./migrations/0001_init.sql
+# Run any other migrations in order (0002, 0003, ... 0010_razorpay_orders.sql)
 npx wrangler secret put JWT_SECRET   # paste a long random string when prompted
 node seed-admin.mjs "admin@aviator.local" "admin" "your-password" > seed.sql
 npx wrangler d1 execute aviator-db --remote --file=./seed.sql
 npx wrangler deploy
 ```
+
+## Online payments (Razorpay)
+
+To let players add credits instantly via UPI/card/netbanking:
+
+1. Create a [Razorpay](https://dashboard.razorpay.com) account and get your API keys.
+2. Set secrets on your Worker:
+   ```
+   npx wrangler secret put RAZORPAY_KEY_ID
+   npx wrangler secret put RAZORPAY_KEY_SECRET
+   npx wrangler secret put RAZORPAY_WEBHOOK_SECRET   # optional but recommended
+   ```
+3. Run the Razorpay migration:
+   ```
+   npx wrangler d1 execute aviator-db --remote --file=./migrations/0010_razorpay_orders.sql
+   ```
+4. (Optional) In the Razorpay dashboard, add a webhook pointing to:
+   `https://your-worker.workers.dev/api/wallet/razorpay/webhook`
+   with the `payment.captured` event.
+
+Players see a **Pay Online** section on the Wallet page. Credits are added
+immediately after payment. The conversion rate (credits per ₹) is configurable
+from the admin panel (`credits_per_rupee`, default 1).
+
+Use Razorpay **test keys** while developing; switch to live keys in production.
 
 ## Local dev
 
@@ -31,7 +57,13 @@ npx wrangler d1 execute aviator-db --local --file=./migrations/0001_init.sql
 npx wrangler dev
 ```
 
-`.dev.vars` (gitignored) should contain `JWT_SECRET=anything-for-local-dev`.
+`.dev.vars` (gitignored) should contain:
+
+```
+JWT_SECRET=anything-for-local-dev
+RAZORPAY_KEY_ID=rzp_test_...
+RAZORPAY_KEY_SECRET=your_test_secret
+```
 
 ## Differences from the `server/` (Node) build
 

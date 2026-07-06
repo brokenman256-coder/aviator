@@ -7,6 +7,8 @@
     return;
   }
 
+  let razorpayConfig = null;
+
   function logout() {
     localStorage.removeItem("aviator_token");
     localStorage.removeItem("aviator_user");
@@ -22,6 +24,10 @@
     admin_adjust: "Admin adjustment",
     recharge_approved: "Funds added",
     withdrawal_approved: "Withdrawal",
+    razorpay_topup: "Online payment",
+    daily_wheel: "Daily wheel",
+    streak_bonus: "Streak bonus",
+    referral_bonus: "Referral bonus",
   };
 
   const STATUS_PILL = { pending: "warn", approved: "ok", rejected: "bad" };
@@ -30,6 +36,39 @@
     return String(str).replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     }[c]));
+  }
+
+  function showError(boxId, message) {
+    const box = document.getElementById(boxId);
+    box.textContent = message;
+    box.classList.remove("hidden");
+  }
+
+  function hideError(boxId) {
+    document.getElementById(boxId).classList.add("hidden");
+  }
+
+  function updateCreditsPreview() {
+    const preview = document.getElementById("creditsPreview");
+    if (!razorpayConfig?.configured) return;
+    const amount = Number(document.getElementById("onlinePayAmount").value);
+    if (!isFinite(amount) || amount <= 0) {
+      preview.textContent = "";
+      return;
+    }
+    const credits = Math.round(amount * razorpayConfig.creditsPerRupee * 100) / 100;
+    preview.textContent = `You'll receive ${credits.toFixed(2)} credits`;
+  }
+
+  async function loadRazorpayConfig() {
+    const res = await fetch("/api/wallet/razorpay/config", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return;
+    razorpayConfig = await res.json();
+    if (!razorpayConfig.configured) {
+      document.getElementById("onlinePayPanel").style.display = "none";
+    }
   }
 
   async function load() {
@@ -80,13 +119,11 @@
   }
 
   async function submitFundRequest(type, amountInputId, errorBoxId) {
-    const errorBox = document.getElementById(errorBoxId);
-    errorBox.classList.add("hidden");
+    hideError(errorBoxId);
     const amountInput = document.getElementById(amountInputId);
     const amount = Number(amountInput.value);
     if (!isFinite(amount) || amount <= 0) {
-      errorBox.textContent = "Enter a valid amount";
-      errorBox.classList.remove("hidden");
+      showError(errorBoxId, "Enter a valid amount");
       return;
     }
     try {
@@ -100,8 +137,89 @@
       amountInput.value = "";
       await loadRechargeRequests();
     } catch (err) {
-      errorBox.textContent = err.message;
-      errorBox.classList.remove("hidden");
+      showError(errorBoxId, err.message);
+    }
+  }
+
+  async function payOnline() {
+    hideError("onlinePayError");
+    if (!razorpayConfig?.configured) {
+      showError("onlinePayError", "Online payments are not available");
+      return;
+    }
+    if (typeof Razorpay === "undefined") {
+      showError("onlinePayError", "Payment gateway is still loading");
+      return;
+    }
+
+    const amountInr = Number(document.getElementById("onlinePayAmount").value);
+    if (!isFinite(amountInr) || amountInr < 10) {
+      showError("onlinePayError", "Minimum payment is ₹10");
+      return;
+    }
+
+    const btn = document.getElementById("payOnlineBtn");
+    btn.disabled = true;
+    btn.textContent = "Opening...";
+
+    try {
+      const orderRes = await fetch("/api/wallet/razorpay/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amountInr }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok) throw new Error(orderData.error || "Could not start payment");
+
+      const meRes = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+      let username = "";
+      let email = "";
+      if (meRes?.ok) {
+        const meData = await meRes.json();
+        username = meData.user?.username || "";
+        email = meData.user?.email || "";
+      }
+
+      const rzp = new Razorpay({
+        key: orderData.keyId,
+        amount: orderData.amountPaise,
+        currency: "INR",
+        name: "SkyDash",
+        description: `Add ${orderData.creditsToAdd} credits`,
+        order_id: orderData.razorpayOrderId,
+        prefill: { name: username, email },
+        theme: { color: "#22c55e" },
+        handler: async (response) => {
+          const verifyRes = await fetch("/api/wallet/razorpay/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          const verifyData = await verifyRes.json();
+          if (!verifyRes.ok) {
+            showError("onlinePayError", verifyData.error || "Payment verification failed");
+            return;
+          }
+          document.getElementById("onlinePayAmount").value = "";
+          updateCreditsPreview();
+          await load();
+        },
+      });
+
+      rzp.on("payment.failed", (response) => {
+        showError("onlinePayError", response.error?.description || "Payment failed");
+      });
+
+      rzp.open();
+    } catch (err) {
+      showError("onlinePayError", err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Pay now";
     }
   }
 
@@ -113,6 +231,10 @@
     submitFundRequest("withdrawal", "withdrawAmount", "withdrawError");
   });
 
+  document.getElementById("payOnlineBtn").addEventListener("click", payOnline);
+  document.getElementById("onlinePayAmount").addEventListener("input", updateCreditsPreview);
+
+  loadRazorpayConfig().then(updateCreditsPreview);
   load();
   loadRechargeRequests();
 })();
