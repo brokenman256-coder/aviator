@@ -6,6 +6,20 @@ const wallet = new Hono();
 
 // Prizes on the daily spin wheel, in wheel-segment order.
 const WHEEL_PRIZES = [100, 50, 20, 30, 40, 500];
+// Odds per segment (same order). The wheel shows six equal slices, but the big
+// 500 is deliberately a ~1% rare jackpot and the small amounts dominate, so the
+// average daily payout stays low and the house stays in profit — it's a prize
+// wheel, not a handout. Average payout ≈ 40 credits/spin.
+const WHEEL_WEIGHTS = [14, 24, 70, 50, 40, 2]; // 100, 50, 20, 30, 40, 500 → total 200
+
+function pickWeightedIndex() {
+  const total = WHEEL_WEIGHTS.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < WHEEL_WEIGHTS.length; i++) {
+    if ((r -= WHEEL_WEIGHTS[i]) < 0) return i;
+  }
+  return WHEEL_WEIGHTS.length - 1;
+}
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10); // UTC calendar day
@@ -41,7 +55,7 @@ wallet.get("/daily-wheel", authRequired, async (c) => {
 wallet.post("/daily-wheel/spin", authRequired, async (c) => {
   const user = c.get("user");
   const date = todayKey();
-  const index = Math.floor(Math.random() * WHEEL_PRIZES.length);
+  const index = pickWeightedIndex();
   const amount = WHEEL_PRIZES[index];
   const now = new Date().toISOString();
 
