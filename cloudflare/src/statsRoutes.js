@@ -50,6 +50,30 @@ function achievementsFor(s, extra) {
   return defs;
 }
 
+// Lightweight "today" highlights for the game-page ticker.
+stats.get("/live", authRequired, async (c) => {
+  const since = new Date().toISOString().slice(0, 10); // start of UTC day
+  const row = await c.env.DB.prepare(
+    `SELECT
+       COALESCE(MAX(b.payout), 0) AS biggestWin,
+       COALESCE(MAX(b.cashout_multiplier), 0) AS biggestMultiplier,
+       COUNT(*) AS betsToday
+     FROM bets b
+     WHERE b.status = 'cashed_out' AND b.created_at >= ?`
+  ).bind(since).first();
+  const winner = await c.env.DB.prepare(
+    `SELECT u.username, b.payout FROM bets b JOIN users u ON u.id = b.user_id
+     WHERE b.status = 'cashed_out' AND b.created_at >= ?
+     ORDER BY b.payout DESC LIMIT 1`
+  ).bind(since).first();
+  return c.json({
+    biggestWin: Math.round((row.biggestWin || 0) * 100) / 100,
+    biggestMultiplier: Math.round((row.biggestMultiplier || 0) * 100) / 100,
+    biggestWinner: winner ? winner.username : null,
+    betsToday: row.betsToday || 0,
+  });
+});
+
 stats.get("/me", authRequired, async (c) => {
   const user = c.get("user");
   const s = await computeUserStats(c.env.DB, user.id);

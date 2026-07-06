@@ -15,6 +15,7 @@
         <span class="brand-name" id="brandName">SKYDASH</span>
       </div>
       <div class="topbar-right">
+        <span id="onlinePill" class="online-pill"><span class="online-dot"></span><span id="onlineCount">—</span> online</span>
         <a id="usernamePill" class="username-pill" href="profile.html" style="text-decoration:none;"></a>
         <button id="dailyBonusBtn" class="ghost-btn">🎡 Daily Bonus</button>
         <a class="ghost-btn" href="leaderboard.html">Leaders</a>
@@ -30,11 +31,17 @@
       </div>
     </header>
 
+    <div id="winTicker" class="win-ticker hidden">
+      <span class="win-ticker-label">🏆 Biggest win today</span>
+      <span id="winTickerText" class="win-ticker-text">—</span>
+    </div>
+
     <div id="history" class="history"></div>
 
     <main class="board">
       <canvas id="canvas"></canvas>
       <div id="roundBadge" class="round-badge">Round #—</div>
+      <div id="celebrateLayer" class="celebrate-layer"></div>
       <div class="overlay">
         <div id="stateText" class="state-text">Connecting…</div>
         <div id="multiplierText" class="multiplier-text">1.00x</div>

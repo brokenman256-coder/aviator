@@ -374,8 +374,56 @@
   socket.on("bet:cashed_out", ({ slot, multiplier, payout, balance }) => {
     setBalance(balance);
     sfx.cashout();
+    celebrate(multiplier, payout);
     betPanels[slot].onCashedOut(multiplier, payout);
   });
+
+  // ---------- Online count + win ticker + celebration ----------
+  const onlineCountEl = document.getElementById("onlineCount");
+  socket.on("online", ({ count }) => { onlineCountEl.textContent = count; });
+
+  async function loadWinTicker() {
+    try {
+      const res = await fetch("/api/stats/live", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const d = await res.json();
+      const ticker = document.getElementById("winTicker");
+      if (d.biggestWin > 0 && d.biggestWinner) {
+        document.getElementById("winTickerText").textContent =
+          `${d.biggestWinner} · ${d.biggestWin.toLocaleString()} @ ${d.biggestMultiplier.toFixed(2)}x`;
+        ticker.classList.remove("hidden");
+      } else {
+        ticker.classList.add("hidden");
+      }
+    } catch {
+      // ticker is a nice-to-have; ignore failures
+    }
+  }
+  loadWinTicker();
+  setInterval(loadWinTicker, 20000);
+
+  const celebrateLayer = document.getElementById("celebrateLayer");
+  function celebrate(multiplier, payout) {
+    // Floating payout badge
+    const badge = document.createElement("div");
+    badge.className = "cashout-badge";
+    badge.textContent = `+${Number(payout).toFixed(2)} · ${Number(multiplier).toFixed(2)}x`;
+    celebrateLayer.appendChild(badge);
+    setTimeout(() => badge.remove(), 1600);
+    // Confetti burst
+    const colors = ["#ff2d55", "#ffd24a", "#2ecc71", "#2d7dff", "#ff5c7a"];
+    for (let i = 0; i < 22; i++) {
+      const p = document.createElement("span");
+      p.className = "confetti";
+      p.style.background = colors[i % colors.length];
+      p.style.left = "50%";
+      p.style.setProperty("--dx", (Math.random() * 220 - 110).toFixed(0) + "px");
+      p.style.setProperty("--dy", (-Math.random() * 160 - 40).toFixed(0) + "px");
+      p.style.setProperty("--rot", (Math.random() * 540 - 270).toFixed(0) + "deg");
+      celebrateLayer.appendChild(p);
+      setTimeout(() => p.remove(), 1200);
+    }
+  }
 
   socket.on("bet:error", ({ slot, error }) => {
     toast(error);

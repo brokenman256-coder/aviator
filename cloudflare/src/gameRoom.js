@@ -86,13 +86,21 @@ export class GameRoom extends DurableObject {
     this.sessions.set(server, { userId, username });
 
     server.addEventListener("message", (event) => this.handleMessage(server, userId, event.data));
-    server.addEventListener("close", () => this.sessions.delete(server));
-    server.addEventListener("error", () => this.sessions.delete(server));
+    server.addEventListener("close", () => { this.sessions.delete(server); this.broadcastOnline(); });
+    server.addEventListener("error", () => { this.sessions.delete(server); this.broadcastOnline(); });
 
     await this.ensureStarted();
     this.sendTo(server, { type: "round:state", ...this.publicState() });
+    this.broadcastOnline();
 
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  // Distinct players currently connected (a player with two tabs counts once).
+  broadcastOnline() {
+    const ids = new Set();
+    for (const s of this.sessions.values()) ids.add(s.userId);
+    this.broadcast({ type: "online", count: ids.size });
   }
 
   async ensureStarted() {
