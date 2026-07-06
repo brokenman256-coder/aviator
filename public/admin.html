@@ -5,85 +5,67 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Aviator — Admin</title>
 <link rel="stylesheet" href="css/style.css" />
+<style>
+  .payment-request { border:1px solid #444; padding:15px; margin:10px 0; border-radius:8px; }
+  .qr-upload { text-align:center; padding:20px; background:#1a1a1a; border-radius:12px; }
+</style>
 </head>
 <body>
   <div class="app wide">
     <header class="topbar">
-      <div class="brand">
-        <span class="brand-icon"><svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M2 12L22 2L14 22L11 13L2 12Z"/></svg></span>
-        <span class="brand-name">AVIATOR ADMIN</span>
-      </div>
+      <div class="brand"><span class="brand-name">🚀 ADMIN DASHBOARD</span></div>
       <div class="topbar-right">
-        <span id="usernamePill" class="username-pill"></span>
-        <a class="ghost-btn" href="index.html">Back to game</a>
-        <button id="logoutBtn" class="ghost-btn">Log out</button>
+        <span id="usernamePill"></span>
+        <a href="index.html" class="ghost-btn">Game</a>
+        <button id="logoutBtn" class="ghost-btn">Logout</button>
       </div>
     </header>
 
-    <div id="deniedBox" class="error-box hidden">Admin access required.</div>
-
-    <div id="adminContent" class="section-hidden" style="display:flex; flex-direction:column; gap:16px;">
+    <div id="adminContent">
+      <!-- Original Stats -->
       <div class="admin-grid">
         <div class="stat-card"><div class="stat-label">Users</div><div class="stat-value" id="statUsers">—</div></div>
-        <div class="stat-card"><div class="stat-label">Rounds Played</div><div class="stat-value" id="statRounds">—</div></div>
-        <div class="stat-card"><div class="stat-label">Total Wagered</div><div class="stat-value" id="statWagered">—</div></div>
-        <div class="stat-card"><div class="stat-label">Total Paid Out</div><div class="stat-value" id="statPaidOut">—</div></div>
-        <div class="stat-card"><div class="stat-label">House Profit</div><div class="stat-value" id="statProfit">—</div></div>
+        <div class="stat-card"><div class="stat-label">Rounds</div><div class="stat-value" id="statRounds">—</div></div>
+        <div class="stat-card"><div class="stat-label">Wagered</div><div class="stat-value" id="statWagered">—</div></div>
+        <div class="stat-card"><div class="stat-label">Paid Out</div><div class="stat-value" id="statPaidOut">—</div></div>
+        <div class="stat-card"><div class="stat-label">Profit</div><div class="stat-value" id="statProfit">—</div></div>
       </div>
 
+      <!-- New: Deposit QR Upload -->
+      <div class="panel qr-upload">
+        <h2>Upload Deposit QR Code</h2>
+        <input type="file" id="qrUpload" accept="image/*">
+        <button id="uploadQRBtn">Upload QR</button>
+        <div id="currentQRPreview"></div>
+      </div>
+
+      <!-- New: Payment Requests -->
+      <div class="panel">
+        <h2>Pending Payment Requests</h2>
+        <div id="paymentRequests"></div>
+      </div>
+
+      <!-- Original Settings -->
       <div class="panel">
         <h2>Game Settings</h2>
         <div class="settings-grid">
-          <div class="field">
-            <label>House edge (%)</label>
-            <input type="number" id="settingHouseEdge" min="0" max="50" step="0.1" />
-          </div>
-          <div class="field">
-            <label>Signup bonus (credits)</label>
-            <input type="number" id="settingBonus" min="0" step="1" />
-          </div>
-          <div class="field">
-            <label>Min bet</label>
-            <input type="number" id="settingMinBet" min="1" step="1" />
-          </div>
-          <div class="field">
-            <label>Max bet</label>
-            <input type="number" id="settingMaxBet" min="1" step="1" />
-          </div>
+          <div class="field"><label>House edge (%)</label><input type="number" id="settingHouseEdge" step="0.1"></div>
+          <div class="field"><label>Signup bonus</label><input type="number" id="settingBonus"></div>
+          <div class="field"><label>Min Bet</label><input type="number" id="settingMinBet"></div>
+          <div class="field"><label>Max Bet</label><input type="number" id="settingMaxBet"></div>
         </div>
-        <button id="saveSettingsBtn" class="primary-btn" style="width:fit-content; padding:9px 20px;">Save Settings</button>
+        <button id="saveSettingsBtn">Save Settings</button>
       </div>
 
+      <!-- Original Users Table -->
       <div class="panel">
         <h2>Users</h2>
         <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th><th>Username</th><th>Email</th><th>Balance</th>
-                <th>Verified</th><th>Status</th><th>Role</th><th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="usersTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>Recent Rounds</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>ID</th><th>Crash Point</th><th>House Edge</th><th>Started</th></tr>
-            </thead>
-            <tbody id="roundsTableBody"></tbody>
-          </table>
+          <table><thead><tr><th>ID</th><th>Username</th><th>Balance</th><th>Actions</th></tr></thead><tbody id="usersTableBody"></tbody></table>
         </div>
       </div>
     </div>
   </div>
-
-  <div id="toast" class="toast hidden"></div>
 
   <script src="js/admin.js"></script>
 </body>
