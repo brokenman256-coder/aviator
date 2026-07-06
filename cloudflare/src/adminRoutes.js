@@ -51,14 +51,13 @@ admin.get("/settings", async (c) => {
     maxBet: Number(await getSetting(c.env.DB, "max_bet")),
     referralBonusCredits: Number(await getSetting(c.env.DB, "referral_bonus_credits")),
     streakBonusPerDay: Number(await getSetting(c.env.DB, "streak_bonus_per_day")),
+    creditsPerRupee: Number(await getSetting(c.env.DB, "credits_per_rupee")),
     wheelPrizes: await getSetting(c.env.DB, "wheel_prizes"),
     wheelWeights: await getSetting(c.env.DB, "wheel_weights"),
     siteName: await getSetting(c.env.DB, "site_name"),
   });
 });
 
-// Keeps a comma-separated list of non-negative numbers, dropping junk. Used to
-// sanitize the admin-entered wheel prizes / weights before they're stored.
 function sanitizeCsvNums(str) {
   return String(str || "")
     .split(",")
@@ -69,7 +68,18 @@ function sanitizeCsvNums(str) {
 
 admin.post("/settings", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const { houseEdgePercent, signupBonusCredits, minBet, maxBet, referralBonusCredits, streakBonusPerDay, wheelPrizes, wheelWeights, siteName } = body;
+  const {
+    houseEdgePercent,
+    signupBonusCredits,
+    minBet,
+    maxBet,
+    referralBonusCredits,
+    streakBonusPerDay,
+    creditsPerRupee,
+    wheelPrizes,
+    wheelWeights,
+    siteName,
+  } = body;
   if (siteName !== undefined) {
     const clean = String(siteName).trim().slice(0, 24);
     if (clean) await setSetting(c.env.DB, "site_name", clean);
@@ -87,6 +97,9 @@ admin.post("/settings", async (c) => {
   }
   if (streakBonusPerDay !== undefined) {
     await setSetting(c.env.DB, "streak_bonus_per_day", Math.max(0, Number(streakBonusPerDay)));
+  }
+  if (creditsPerRupee !== undefined) {
+    await setSetting(c.env.DB, "credits_per_rupee", Math.max(0.01, Number(creditsPerRupee)));
   }
   if (wheelPrizes !== undefined) {
     const clean = sanitizeCsvNums(wheelPrizes);
@@ -112,8 +125,6 @@ admin.get("/stats", async (c) => {
   const userCount = (await c.env.DB.prepare("SELECT COUNT(*) AS c FROM users").first()).c;
   const roundCount = (await c.env.DB.prepare("SELECT COUNT(*) AS c FROM rounds WHERE ended_at IS NOT NULL").first()).c;
 
-  // Reward payouts (credits handed out, separate from bet flow) so the admin can
-  // see how much the wheel / streak / referral programs are costing the house.
   const rewards = await c.env.DB.prepare(
     `SELECT
       COALESCE(SUM(CASE WHEN type = 'daily_wheel' THEN amount ELSE 0 END), 0) AS wheelPaid,
@@ -144,7 +155,6 @@ admin.get("/rounds", async (c) => {
   return c.json({ rounds: results });
 });
 
-// Per-user drill-down: full profile plus their recent bets and wallet activity.
 admin.get("/users/:id", async (c) => {
   const userId = Number(c.req.param("id"));
   const user = await c.env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(userId).first();
@@ -160,7 +170,6 @@ admin.get("/users/:id", async (c) => {
   return c.json({ user: publicUser(user), bets, transactions });
 });
 
-// Deletes a user account entirely, including their bets and wallet ledger.
 admin.post("/users/:id/delete", async (c) => {
   const userId = Number(c.req.param("id"));
   if (userId === c.get("user").id) return c.json({ error: "You can't delete your own account" }, 400);
@@ -173,8 +182,6 @@ admin.post("/users/:id/delete", async (c) => {
   return c.json({ ok: true });
 });
 
-// Live view into the current round, including the crash point before it happens.
-// Admin-only: regular players never see this over the WebSocket feed.
 admin.get("/live-round", async (c) => {
   const id = c.env.GAME_ROOM.idFromName("global");
   const stub = c.env.GAME_ROOM.get(id);
@@ -182,9 +189,6 @@ admin.get("/live-round", async (c) => {
   return c.json(await res.json());
 });
 
-// Immediately ends the current round (marks it crashed right now), e.g. to
-// recover from a stuck state. Use sparingly — it's a manual override, not
-// part of normal gameplay.
 admin.post("/round/force-crash", async (c) => {
   const id = c.env.GAME_ROOM.idFromName("global");
   const stub = c.env.GAME_ROOM.get(id);
@@ -192,10 +196,8 @@ admin.post("/round/force-crash", async (c) => {
   return c.json(await res.json());
 });
 
-// ---------- Fund requests (recharge / withdrawal) ----------
-
 admin.get("/recharge-requests", async (c) => {
-  const status = c.req.query("status"); // pending | approved | rejected | omitted for all
+  const status = c.req.query("status");
   const query = status
     ? c.env.DB.prepare(
         `SELECT rr.*, u.username FROM recharge_requests rr JOIN users u ON u.id = rr.user_id
@@ -216,8 +218,6 @@ admin.post("/recharge-requests/:id/approve", async (c) => {
   if (!request) return c.json({ error: "Request not found" }, 404);
   if (request.status !== "pending") return c.json({ error: `Request is already ${request.status}` }, 400);
 
-  // Mark resolved first, guarded on still being pending, so two concurrent
-  // approve/reject clicks can't both succeed against the same request.
   const claim = await c.env.DB.prepare(
     "UPDATE recharge_requests SET status = 'approved', admin_note = ?, resolved_by = ?, resolved_at = ? WHERE id = ? AND status = 'pending'"
   ).bind(body.note || null, c.get("user").id, new Date().toISOString(), id).run();
@@ -231,10 +231,6 @@ admin.post("/recharge-requests/:id/approve", async (c) => {
     const balance = await adjustBalance(c.env.DB, request.user_id, delta, txType, { requestId: id, note: body.note || null });
     return c.json({ ok: true, balance });
   } catch (err) {
-    // The balance couldn't actually be adjusted (e.g. a withdrawal request
-    // whose balance has since dropped below the requested amount) — put the
-    // request back to pending rather than leaving it "approved" with no
-    // matching ledger entry.
     await c.env.DB.prepare(
       "UPDATE recharge_requests SET status = 'pending', admin_note = NULL, resolved_by = NULL, resolved_at = NULL WHERE id = ?"
     ).bind(id).run();
