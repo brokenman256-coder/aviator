@@ -391,7 +391,48 @@
   window.addEventListener("resize", resizeCanvas);
   resizeCanvas();
 
+  // Background starfield — a fixed set of dots we drift to imply motion.
+  const STARS = Array.from({ length: 70 }, () => ({
+    x: Math.random(),
+    y: Math.random(),
+    r: Math.random() * 1.4 + 0.3,
+    a: Math.random() * 0.35 + 0.12,
+  }));
+
+  // Aviator's signature look: a slowly rotating fan of faint red rays that
+  // emanate from the launch corner, plus drifting stars for a sense of speed.
+  function drawBackground(now, w, h, cx, cy, intensity) {
+    const rot = (now / 7000) * Math.PI * 2;
+    const rays = 16;
+    const R = Math.hypot(w, h) * 1.1;
+    const wedge = (Math.PI * 2) / rays;
+    ctx.save();
+    for (let i = 0; i < rays; i++) {
+      const a0 = rot + i * wedge;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, R, a0, a0 + wedge / 2);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(255,45,85,${(0.028 + intensity * 0.05).toFixed(3)})`;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    const drift = (now / 1000) * (0.02 + intensity * 0.06);
+    ctx.save();
+    for (const s of STARS) {
+      const sx = ((((s.x - drift) % 1) + 1) % 1) * w;
+      const sy = ((s.y + drift * 0.3) % 1) * h;
+      ctx.beginPath();
+      ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawFrame(elapsedMs, currentMultiplier, crashed) {
+    const now = performance.now();
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     ctx.clearRect(0, 0, w, h);
@@ -403,15 +444,9 @@
     const toX = (t) => padding + (t / xMax) * (w - padding * 2);
     const toY = (m) => h - padding - ((m - 1) / (yMax - 1)) * (h - padding * 2);
 
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    ctx.lineWidth = 1;
-    for (let i = 1; i <= 4; i++) {
-      const y = padding + ((h - padding * 2) / 4) * i;
-      ctx.beginPath();
-      ctx.moveTo(padding, y);
-      ctx.lineTo(w - padding, y);
-      ctx.stroke();
-    }
+    // Rays/stars ramp up with the multiplier while flying, calm otherwise.
+    const intensity = crashed ? 0.15 : Math.min(1, (currentMultiplier - 1) / 4);
+    drawBackground(now, w, h, padding, h - padding, intensity);
 
     const steps = 80;
     const points = [];
@@ -428,17 +463,20 @@
     ctx.lineTo(toX(0), h - padding);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, crashed ? "rgba(229,5,57,0.40)" : "rgba(255,45,85,0.34)");
-    grad.addColorStop(1, "rgba(0,0,0,0)");
+    grad.addColorStop(0, crashed ? "rgba(229,5,57,0.45)" : "rgba(255,45,85,0.40)");
+    grad.addColorStop(1, "rgba(255,45,85,0)");
     ctx.fillStyle = grad;
     ctx.fill();
 
     ctx.beginPath();
     points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
     ctx.strokeStyle = crashed ? "#e50539" : "#ff2d55";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.lineJoin = "round";
+    ctx.shadowColor = crashed ? "rgba(229,5,57,0.8)" : "rgba(255,45,85,0.8)";
+    ctx.shadowBlur = 12;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     // Plane, oriented along the direction of travel.
     const [px, py] = points[points.length - 1];
@@ -449,15 +487,35 @@
     ctx.rotate(angle);
     ctx.shadowColor = crashed ? "rgba(229,5,57,0.7)" : "rgba(255,45,85,0.7)";
     ctx.shadowBlur = 10;
-    drawPlane(ctx, crashed);
+    drawPlane(ctx, crashed, now);
     ctx.restore();
   }
 
-  // Draws a recognizable airplane at the origin, pointing along +x.
-  function drawPlane(ctx, crashed) {
+  // Draws a recognizable propeller plane at the origin, pointing along +x.
+  function drawPlane(ctx, crashed, now) {
     const body = crashed ? "#e50539" : "#ff2d55";
     const trim = crashed ? "#ff5c7a" : "#ffd0dc";
     ctx.scale(1.3, 1.3);
+
+    // Spinning propeller disc at the nose.
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.translate(19, 0);
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 2, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const spin = (now / 40) % (Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 1.4;
+    for (let b = 0; b < 2; b++) {
+      const a = spin + b * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.sin(a) * 1.5, Math.cos(a) * 10);
+      ctx.stroke();
+    }
+    ctx.restore();
 
     // Wings (swept back from the fuselage, top and bottom mirror).
     ctx.fillStyle = body;
