@@ -750,6 +750,142 @@ th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: 
   font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
 }
 
+/* Live bets feed */
+.feed-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feed-tabs {
+  display: flex;
+  gap: 6px;
+  background: var(--panel-2);
+  border-radius: 20px;
+  padding: 4px;
+}
+
+.feed-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  border-radius: 16px;
+  padding: 7px 0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.feed-tab.active { background: var(--bg-1); color: var(--text); }
+
+.feed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+}
+
+.feed-count {
+  background: var(--panel-2);
+  border-radius: 10px;
+  padding: 1px 9px;
+  color: var(--text);
+}
+
+.feed-cols, .feed-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 0.9fr 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.feed-cols {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  padding: 0 8px;
+}
+
+.feed-col-bet, .feed-col-cash { text-align: right; }
+.feed-col-x { text-align: center; }
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.feed-row {
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feed-row.cashed {
+  background: rgba(31, 157, 85, 0.14);
+  border-color: rgba(46, 204, 113, 0.5);
+}
+
+.feed-row.mine { border-color: var(--gold); }
+
+.feed-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.feed-user > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-avatar {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.feed-mult {
+  background: var(--bg-0);
+  border-radius: 10px;
+  padding: 2px 8px;
+  color: var(--gold-bright);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.feed-col-cash { color: var(--green-bright); }
+
+.feed-empty {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 18px 0;
+}
+
 /* Daily bonus wheel */
 .wheel-wrap {
   position: relative;

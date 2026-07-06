@@ -121,6 +121,25 @@
         </button>
       </div>
     </section>
+
+    <section class="feed-panel">
+      <div class="feed-tabs">
+        <button class="feed-tab active" data-feed="all">All Bets</button>
+        <button class="feed-tab" data-feed="my">My Bets</button>
+        <button class="feed-tab" data-feed="top">Top</button>
+      </div>
+      <div class="feed-head">
+        <span id="feedTitle">ALL BETS</span>
+        <span id="feedCount" class="feed-count">0</span>
+      </div>
+      <div class="feed-cols">
+        <span>Player</span>
+        <span class="feed-col-bet">Bet</span>
+        <span class="feed-col-x">X</span>
+        <span class="feed-col-cash">Cash out</span>
+      </div>
+      <div id="feedList" class="feed-list"></div>
+    </section>
   </div>
 
   <div id="wheelModal" class="modal hidden">

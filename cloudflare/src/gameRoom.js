@@ -16,6 +16,14 @@ function betKey(userId, slot) {
   return `${userId}:${slot}`;
 }
 
+// Masks a username for the public live feed (e.g. "brokenman" -> "b***n"),
+// matching the privacy style crash games use for their all-bets list.
+function maskName(name) {
+  const s = String(name || "Player");
+  if (s.length <= 2) return s[0] + "***";
+  return s[0] + "***" + s[s.length - 1];
+}
+
 // A single global "room" that owns round state and ticks continuously while
 // a round is in flight, broadcasting to every connected player's WebSocket.
 // An active setInterval keeps this Durable Object resident in memory for the
@@ -67,6 +75,7 @@ export class GameRoom extends DurableObject {
       const user = await this.env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(payload.uid).first();
       if (!user || user.is_banned) throw new Error("unauthorized");
       userId = user.id;
+      var username = user.username;
     } catch {
       return new Response("Unauthorized", { status: 401 });
     }
@@ -74,7 +83,7 @@ export class GameRoom extends DurableObject {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     server.accept();
-    this.sessions.set(server, { userId });
+    this.sessions.set(server, { userId, username });
 
     server.addEventListener("message", (event) => this.handleMessage(server, userId, event.data));
     server.addEventListener("close", () => this.sessions.delete(server));
@@ -116,6 +125,13 @@ export class GameRoom extends DurableObject {
     for (const [ws, session] of this.sessions.entries()) {
       if (session.userId === userId) this.sendTo(ws, payload);
     }
+  }
+
+  usernameFor(userId) {
+    for (const session of this.sessions.values()) {
+      if (session.userId === userId) return session.username;
+    }
+    return null;
   }
 
   async handleMessage(ws, userId, raw) {
@@ -288,6 +304,15 @@ export class GameRoom extends DurableObject {
         cashedOut: false,
       });
 
+      // Publish to the live "all bets" feed every connected player sees.
+      this.broadcast({
+        type: "feed:bet",
+        betId: info.meta.last_row_id,
+        userId,
+        name: maskName(this.usernameFor(userId)),
+        amount,
+      });
+
       return { slot, balance: newBalance, betId: info.meta.last_row_id };
     } catch (err) {
       this.activeBets.delete(key);
@@ -306,6 +331,7 @@ export class GameRoom extends DurableObject {
 
     const newBalance = await adjustBalance(this.env.DB, userId, bet.amount, "bet_cancel", { roundId: this.round.id, slot });
     await this.env.DB.prepare("UPDATE bets SET status = 'cancelled' WHERE id = ?").bind(bet.betId).run();
+    this.broadcast({ type: "feed:cancel", betId: bet.betId });
     return { slot, balance: newBalance };
   }
 
@@ -334,6 +360,12 @@ export class GameRoom extends DurableObject {
 
     const result = { slot: bet.slot, multiplier, payout, balance: newBalance };
     this.sendToUser(bet.userId, { type: "bet:cashed_out", ...result });
+    this.broadcast({
+      type: "feed:cashout",
+      betId: bet.betId,
+      multiplier: Number(multiplier.toFixed(2)),
+      payout,
+    });
     return result;
   }
 

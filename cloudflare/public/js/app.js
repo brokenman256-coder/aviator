@@ -358,6 +358,80 @@
     if (slot !== undefined && betPanels[slot]) betPanels[slot].onError();
   });
 
+  // ---------- Live bets feed ----------
+  (function liveFeed() {
+    const myId = (JSON.parse(localStorage.getItem("aviator_user") || "{}") || {}).id;
+    const listEl = document.getElementById("feedList");
+    const countEl = document.getElementById("feedCount");
+    const titleEl = document.getElementById("feedTitle");
+    const tabs = document.querySelectorAll(".feed-tab");
+    let activeTab = "all";
+    let rows = []; // { betId, userId, name, amount, multiplier, payout, cashed, mine }
+
+    const AVATAR_COLORS = ["#e50539", "#7b2ff7", "#1f9d55", "#e6a700", "#2d7dff", "#e05a00", "#c026d3", "#0891b2"];
+    function avatarFor(name, userId) {
+      const key = (userId || 0) + (name || "");
+      let h = 0;
+      for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) & 0xffffffff;
+      const color = AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+      const letter = (name || "?").replace(/[^a-zA-Z0-9]/g, "")[0] || "?";
+      return `<span class="feed-avatar" style="background:${color}">${letter.toUpperCase()}</span>`;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function visibleRows() {
+      if (activeTab === "my") return rows.filter((r) => r.mine);
+      if (activeTab === "top") return rows.slice().sort((a, b) => b.amount - a.amount);
+      return rows; // newest first (we unshift)
+    }
+
+    function render() {
+      const list = visibleRows();
+      titleEl.textContent = activeTab === "my" ? "MY BETS" : activeTab === "top" ? "TOP BETS" : "ALL BETS";
+      countEl.textContent = (activeTab === "my" ? list.length : rows.length);
+      if (!list.length) {
+        listEl.innerHTML = `<div class="feed-empty">No bets yet this round.</div>`;
+        return;
+      }
+      listEl.innerHTML = list.map((r) => `
+        <div class="feed-row ${r.cashed ? "cashed" : ""} ${r.mine ? "mine" : ""}">
+          <span class="feed-user">${avatarFor(r.name, r.userId)}<span>${escapeHtml(r.name)}${r.mine ? " (you)" : ""}</span></span>
+          <span class="feed-col-bet">${r.amount.toFixed(2)}</span>
+          <span class="feed-col-x">${r.cashed ? `<span class="feed-mult">${r.multiplier.toFixed(2)}x</span>` : ""}</span>
+          <span class="feed-col-cash">${r.cashed ? r.payout.toFixed(2) : ""}</span>
+        </div>`).join("");
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        tabs.forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+        activeTab = tab.dataset.feed;
+        render();
+      });
+    });
+
+    socket.on("feed:bet", ({ betId, userId, name, amount }) => {
+      rows.unshift({ betId, userId, name, amount, multiplier: 0, payout: 0, cashed: false, mine: userId === myId });
+      if (rows.length > 100) rows.pop();
+      render();
+    });
+    socket.on("feed:cashout", ({ betId, multiplier, payout }) => {
+      const r = rows.find((x) => x.betId === betId);
+      if (r) { r.cashed = true; r.multiplier = multiplier; r.payout = payout; render(); }
+    });
+    socket.on("feed:cancel", ({ betId }) => {
+      rows = rows.filter((x) => x.betId !== betId);
+      render();
+    });
+    socket.on("round:waiting", () => { rows = []; render(); });
+
+    render();
+  })();
+
   // ---------- Bet panels ----------
   class BetPanel {
     constructor(rootEl, slot) {
