@@ -79,13 +79,13 @@
     document.getElementById("settingReferralBonus").value = s.referralBonusCredits;
     document.getElementById("settingStreakPerDay").value = s.streakBonusPerDay;
     document.getElementById("settingCreditsPerRupee").value = s.creditsPerRupee;
+    document.getElementById("settingPaymentUpi").value = s.paymentUpiId || "";
+    document.getElementById("settingPaymentInstructions").value = s.paymentInstructions || "";
     document.getElementById("settingWheelPrizes").value = s.wheelPrizes;
     document.getElementById("settingWheelWeights").value = s.wheelWeights;
     updateWheelAvg();
   }
 
-  // Shows the expected average payout per spin from the current prizes/weights,
-  // so the admin can see at a glance whether the wheel is too generous.
   function updateWheelAvg() {
     const prizes = document.getElementById("settingWheelPrizes").value.split(",").map((n) => Number(n.trim())).filter((n) => isFinite(n));
     const weights = document.getElementById("settingWheelWeights").value.split(",").map((n) => Number(n.trim())).filter((n) => isFinite(n));
@@ -102,6 +102,21 @@
   }
   document.getElementById("settingWheelPrizes").addEventListener("input", updateWheelAvg);
   document.getElementById("settingWheelWeights").addEventListener("input", updateWheelAvg);
+
+  document.getElementById("savePaymentBtn").addEventListener("click", async () => {
+    try {
+      await api("/settings", {
+        method: "POST",
+        body: JSON.stringify({
+          paymentUpiId: document.getElementById("settingPaymentUpi").value,
+          paymentInstructions: document.getElementById("settingPaymentInstructions").value,
+        }),
+      });
+      toast("Payment details saved.");
+    } catch (err) {
+      toast(err.message);
+    }
+  });
 
   document.getElementById("saveSettingsBtn").addEventListener("click", async () => {
     try {
@@ -139,7 +154,6 @@
     }
   });
 
-  // ---------- Live round ----------
   async function loadLiveRound() {
     const s = await api("/live-round");
     document.getElementById("liveRoundId").textContent = s.roundId ? `#${s.roundId}` : "—";
@@ -208,7 +222,6 @@
     }
   });
 
-  // ---------- User drill-down modal ----------
   const userModal = document.getElementById("userModal");
   document.getElementById("closeUserModal").addEventListener("click", () => userModal.classList.add("hidden"));
   userModal.addEventListener("click", (e) => { if (e.target === userModal) userModal.classList.add("hidden"); });
@@ -303,7 +316,7 @@
       const meta = JSON.parse(t.meta);
       if (meta.reason) return `<div style="font-size:11px; color:var(--text-dim); font-style:italic;">${escapeHtml(meta.reason)}</div>`;
     } catch {
-      // meta wasn't JSON or had no reason field — nothing to show
+      // ignore
     }
     return "";
   }
@@ -314,44 +327,116 @@
     }[c]));
   }
 
-  // ---------- Fund requests ----------
+  function formatRequestAmount(r) {
+    if (r.type === "withdrawal") return `${Number(r.amount).toFixed(2)} cr`;
+    if (r.amount_inr) return `₹${Number(r.amount_inr).toFixed(0)} → ${Number(r.amount).toFixed(2)} cr`;
+    return `${Number(r.amount).toFixed(2)} cr`;
+  }
+
+  const proofModal = document.getElementById("proofModal");
+  let currentProofRequestId = null;
+
+  document.getElementById("closeProofModal").addEventListener("click", () => proofModal.classList.add("hidden"));
+  proofModal.addEventListener("click", (e) => { if (e.target === proofModal) proofModal.classList.add("hidden"); });
+
+  async function openProofModal(id) {
+    currentProofRequestId = id;
+    const res = await fetch(`/api/admin/recharge-requests/${id}/screenshot`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast(data.error || "No screenshot");
+      return;
+    }
+
+    document.getElementById("proofModalTitle").textContent = `Payment proof #${id}`;
+    const meta = [];
+    if (data.amountInr) meta.push(`Paid: ₹${Number(data.amountInr).toFixed(2)}`);
+    if (data.paymentReference) meta.push(`Ref: ${escapeHtml(data.paymentReference)}`);
+    document.getElementById("proofMeta").innerHTML = meta.join(" · ") || "No extra details";
+    document.getElementById("proofModalImg").src = `data:${data.mimeType};base64,${data.data}`;
+
+    const actions = document.getElementById("proofActions");
+    actions.innerHTML = `
+      <button class="mini-btn" data-proof-action="approve" style="flex:1;">Approve</button>
+      <button class="mini-btn danger" data-proof-action="reject" style="flex:1;">Reject</button>
+    `;
+    proofModal.classList.remove("hidden");
+  }
+
+  document.getElementById("proofActions").addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-proof-action]");
+    if (!btn || !currentProofRequestId) return;
+    try {
+      if (btn.dataset.proofAction === "approve") {
+        const note = prompt("Note for this approval (optional):", "") || "";
+        await api(`/recharge-requests/${currentProofRequestId}/approve`, { method: "POST", body: JSON.stringify({ note }) });
+        toast("Request approved.");
+      } else {
+        const note = prompt("Reason for rejecting (optional):", "") || "";
+        await api(`/recharge-requests/${currentProofRequestId}/reject`, { method: "POST", body: JSON.stringify({ note }) });
+        toast("Request rejected.");
+      }
+      proofModal.classList.add("hidden");
+      await Promise.all([loadRechargeRequests(), loadUsers(), loadStats()]);
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  async function resolveRequest(id, action) {
+    if (action === "approve") {
+      const note = prompt("Note for this approval (optional):", "") || "";
+      await api(`/recharge-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ note }) });
+      toast("Request approved.");
+    } else {
+      const note = prompt("Reason for rejecting (optional):", "") || "";
+      await api(`/recharge-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) });
+      toast("Request rejected.");
+    }
+    await Promise.all([loadRechargeRequests(), loadUsers(), loadStats()]);
+  }
+
   async function loadRechargeRequests() {
     const { requests } = await api("/recharge-requests");
     const tbody = document.getElementById("rechargeTableBody");
     tbody.innerHTML = requests.length
-      ? requests.map((r) => `
+      ? requests.map((r) => {
+          const proofBtn = r.hasScreenshot
+            ? `<button class="mini-btn" data-action="view-proof" data-id="${r.id}">View proof</button>`
+            : "";
+          const actionBtns = r.status === "pending"
+            ? `${proofBtn}
+               <button class="mini-btn" data-action="recharge-approve" data-id="${r.id}">Approve</button>
+               <button class="mini-btn danger" data-action="recharge-reject" data-id="${r.id}">Reject</button>`
+            : (proofBtn || "—");
+          return `
           <tr>
             <td>${r.id}</td>
             <td>${escapeHtml(r.username)}</td>
             <td><span class="pill ${r.type === "withdrawal" ? "bad" : "ok"}">${r.type === "withdrawal" ? "Withdrawal" : "Add funds"}</span></td>
-            <td>${Number(r.amount).toFixed(2)}</td>
+            <td>${formatRequestAmount(r)}</td>
+            <td style="font-size:11px;">${escapeHtml(r.payment_reference || "—")}</td>
             <td><span class="pill ${r.status === "pending" ? "warn" : r.status === "approved" ? "ok" : "bad"}">${escapeHtml(r.status)}</span></td>
             <td>${new Date(r.created_at).toLocaleString()}</td>
-            <td class="row-actions">
-              ${r.status === "pending"
-                ? `<button class="mini-btn" data-action="recharge-approve" data-id="${r.id}">Approve</button>
-                   <button class="mini-btn danger" data-action="recharge-reject" data-id="${r.id}">Reject</button>`
-                : "—"}
-            </td>
-          </tr>`).join("")
-      : `<tr><td colspan="7" style="color:var(--text-dim);">No requests yet.</td></tr>`;
+            <td class="row-actions">${actionBtns}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="8" style="color:var(--text-dim);">No requests yet.</td></tr>`;
   }
 
   document.getElementById("rechargeTableBody").addEventListener("click", async (e) => {
     const btn = e.target.closest("button.mini-btn");
     if (!btn) return;
     const id = btn.dataset.id;
+    const action = btn.dataset.action;
     try {
-      if (btn.dataset.action === "recharge-approve") {
-        const note = prompt("Note for this approval (optional):", "") || "";
-        await api(`/recharge-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ note }) });
-        toast("Request approved.");
-      } else if (btn.dataset.action === "recharge-reject") {
-        const note = prompt("Reason for rejecting (optional):", "") || "";
-        await api(`/recharge-requests/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) });
-        toast("Request rejected.");
+      if (action === "view-proof") {
+        await openProofModal(id);
+      } else if (action === "recharge-approve" || action === "recharge-reject") {
+        await resolveRequest(id, action === "recharge-approve" ? "approve" : "reject");
       }
-      await Promise.all([loadRechargeRequests(), loadUsers(), loadStats()]);
     } catch (err) {
       toast(err.message);
     }
