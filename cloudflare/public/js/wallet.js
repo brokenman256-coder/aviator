@@ -25,7 +25,6 @@
     admin_adjust: "Admin adjustment",
     recharge_approved: "Funds added",
     withdrawal_approved: "Withdrawal",
-    razorpay_topup: "Online payment",
     daily_wheel: "Daily wheel",
     streak_bonus: "Streak bonus",
     referral_bonus: "Referral bonus",
