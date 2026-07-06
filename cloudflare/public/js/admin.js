@@ -78,6 +78,7 @@
     document.getElementById("settingMaxBet").value = s.maxBet;
     document.getElementById("settingReferralBonus").value = s.referralBonusCredits;
     document.getElementById("settingStreakPerDay").value = s.streakBonusPerDay;
+    document.getElementById("settingCreditsPerRupee").value = s.creditsPerRupee;
     document.getElementById("settingWheelPrizes").value = s.wheelPrizes;
     document.getElementById("settingWheelWeights").value = s.wheelWeights;
     updateWheelAvg();
@@ -114,6 +115,7 @@
           maxBet: Number(document.getElementById("settingMaxBet").value),
           referralBonusCredits: Number(document.getElementById("settingReferralBonus").value),
           streakBonusPerDay: Number(document.getElementById("settingStreakPerDay").value),
+          creditsPerRupee: Number(document.getElementById("settingCreditsPerRupee").value),
         }),
       });
       toast("Settings saved.");
