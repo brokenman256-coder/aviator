@@ -1,15 +1,7 @@
 import { Hono } from "hono";
 import { authRequired } from "./middleware.js";
 import { adjustBalance, getNumberSetting, getSetting, publicUser } from "./store.js";
-import {
-  createRazorpayOrder,
-  isRazorpayConfigured,
-  rupeesToPaise,
-  verifyPaymentSignature,
-  verifyWebhookSignature,
-  getRazorpayConfig,
-} from "./razorpay.js";
-import { validateScreenshot, publicRechargeRequest } from "./paymentProof.js";
+import { validateScreenshot } from "./paymentProof.js";
 
 const wallet = new Hono();
 
@@ -48,28 +40,6 @@ function dayKeyOffset(days) {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-async function fulfillPaymentOrder(db, orderId, razorpayPaymentId) {
-  const order = await db.prepare("SELECT * FROM payment_orders WHERE id = ?").bind(orderId).first();
-  if (!order) throw new Error("Payment order not found");
-  if (order.status === "paid") return order;
-
-  const claim = await db.prepare(
-    "UPDATE payment_orders SET status = 'paid', razorpay_payment_id = ?, paid_at = ? WHERE id = ? AND status = 'created'"
-  ).bind(razorpayPaymentId, new Date().toISOString(), orderId).run();
-
-  if (!claim.meta.changes) {
-    return db.prepare("SELECT * FROM payment_orders WHERE id = ?").bind(orderId).first();
-  }
-
-  await adjustBalance(db, order.user_id, order.credits_to_add, "razorpay_topup", {
-    razorpayOrderId: order.razorpay_order_id,
-    razorpayPaymentId,
-    amountInr: order.amount_inr,
-  });
-
-  return db.prepare("SELECT * FROM payment_orders WHERE id = ?").bind(orderId).first();
 }
 
 wallet.get("/daily-wheel", authRequired, async (c) => {
@@ -250,124 +220,6 @@ wallet.post("/recharge-request", authRequired, async (c) => {
     amountInr,
     credits,
   });
-});
-
-// ---------- Razorpay online payments ----------
-
-wallet.get("/razorpay/config", authRequired, async (c) => {
-  const configured = isRazorpayConfigured(c.env);
-  if (!configured) return c.json({ configured: false });
-  const creditsPerRupee = await getNumberSetting(c.env.DB, "credits_per_rupee");
-  return c.json({
-    configured: true,
-    keyId: getRazorpayConfig(c.env).keyId,
-    creditsPerRupee: isFinite(creditsPerRupee) && creditsPerRupee > 0 ? creditsPerRupee : 1,
-  });
-});
-
-wallet.post("/razorpay/create-order", authRequired, async (c) => {
-  if (!isRazorpayConfigured(c.env)) {
-    return c.json({ error: "Online payments are not configured yet" }, 503);
-  }
-
-  const user = c.get("user");
-  const { amountInr } = await c.req.json().catch(() => ({}));
-  const parsed = Math.round(Number(amountInr) * 100) / 100;
-
-  if (!isFinite(parsed) || parsed < 10) {
-    return c.json({ error: "Minimum payment is ₹10" }, 400);
-  }
-  if (parsed > 50000) {
-    return c.json({ error: "Maximum payment is ₹50,000" }, 400);
-  }
-
-  const creditsPerRupee = await getNumberSetting(c.env.DB, "credits_per_rupee");
-  const rate = isFinite(creditsPerRupee) && creditsPerRupee > 0 ? creditsPerRupee : 1;
-  const creditsToAdd = Math.round(parsed * rate * 100) / 100;
-  const amountPaise = rupeesToPaise(parsed);
-  const receipt = `topup_${user.id}_${Date.now()}`;
-
-  const razorpayOrder = await createRazorpayOrder(c.env, amountPaise, receipt, {
-    userId: String(user.id),
-    purpose: "wallet_topup",
-  });
-
-  const now = new Date().toISOString();
-  const info = await c.env.DB.prepare(
-    `INSERT INTO payment_orders (user_id, razorpay_order_id, amount_inr, amount_paise, credits_to_add, status, created_at)
-     VALUES (?, ?, ?, ?, ?, 'created', ?)`
-  ).bind(user.id, razorpayOrder.id, parsed, amountPaise, creditsToAdd, now).run();
-
-  return c.json({
-    paymentOrderId: info.meta.last_row_id,
-    razorpayOrderId: razorpayOrder.id,
-    amountInr: parsed,
-    amountPaise,
-    creditsToAdd,
-    keyId: getRazorpayConfig(c.env).keyId,
-  });
-});
-
-wallet.post("/razorpay/verify", authRequired, async (c) => {
-  const user = c.get("user");
-  const body = await c.req.json().catch(() => ({}));
-
-  const razorpayOrderId = String(body.razorpay_order_id || "");
-  const razorpayPaymentId = String(body.razorpay_payment_id || "");
-  const razorpaySignature = String(body.razorpay_signature || "");
-
-  if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
-    return c.json({ error: "Missing payment details" }, 400);
-  }
-
-  if (!(await verifyPaymentSignature(c.env, razorpayOrderId, razorpayPaymentId, razorpaySignature))) {
-    return c.json({ error: "Invalid payment signature" }, 400);
-  }
-
-  const order = await c.env.DB.prepare(
-    "SELECT * FROM payment_orders WHERE razorpay_order_id = ?"
-  ).bind(razorpayOrderId).first();
-
-  if (!order) return c.json({ error: "Payment order not found" }, 404);
-  if (order.user_id !== user.id) return c.json({ error: "Forbidden" }, 403);
-
-  const fulfilled = await fulfillPaymentOrder(c.env.DB, order.id, razorpayPaymentId);
-  const updatedUser = await c.env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(user.id).first();
-
-  return c.json({
-    ok: true,
-    creditsAdded: fulfilled.credits_to_add,
-    balance: updatedUser.balance,
-  });
-});
-
-wallet.post("/razorpay/webhook", async (c) => {
-  const body = await c.req.text();
-  const signature = c.req.header("x-razorpay-signature") || "";
-
-  if (!(await verifyWebhookSignature(c.env, body, signature))) {
-    return c.json({ error: "Invalid webhook signature" }, 400);
-  }
-
-  try {
-    const event = JSON.parse(body);
-    if (event.event !== "payment.captured") return c.json({ ok: true });
-
-    const payment = event.payload?.payment?.entity;
-    if (!payment?.order_id || !payment?.id) return c.json({ ok: true });
-
-    const order = await c.env.DB.prepare(
-      "SELECT * FROM payment_orders WHERE razorpay_order_id = ?"
-    ).bind(payment.order_id).first();
-
-    if (!order || order.status === "paid") return c.json({ ok: true });
-
-    await fulfillPaymentOrder(c.env.DB, order.id, payment.id);
-    return c.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    return c.json({ error: "Webhook processing failed" }, 500);
-  }
 });
 
 export default wallet;
