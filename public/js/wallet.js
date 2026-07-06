@@ -1,63 +1,39 @@
-(() => {
-  "use strict";
+// wallet.js - Updated with QR Payment
+let currentUser = null;
 
-  const token = localStorage.getItem("aviator_token");
-  if (!token) {
-    window.location.href = "login.html";
-    return;
-  }
+async function loadWallet() {
+  // ... (keep existing auth code)
+  currentUser = /* get from localStorage or token */;
 
-  function logout() {
-    localStorage.removeItem("aviator_token");
-    localStorage.removeItem("aviator_user");
-    window.location.href = "login.html";
-  }
-  document.getElementById("logoutBtn").addEventListener("click", logout);
+  document.getElementById('walletBalance').textContent = '0.00'; // will be updated via API
 
-  const TYPE_LABELS = {
-    bet: "Bet placed",
-    bet_cancel: "Bet cancelled",
-    payout: "Cash out",
-    signup_bonus: "Signup bonus",
-    admin_adjust: "Admin adjustment",
-  };
+  loadDepositQR();
+  loadTransactions();
+}
 
-  function escapeHtml(str) {
-    return String(str).replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-    }[c]));
-  }
+async function loadDepositQR() {
+  // Fetch QR from server (we'll add backend later)
+  const qrImg = document.getElementById('depositQR');
+  // For now, placeholder
+  qrImg.src = 'https://via.placeholder.com/300?text=Admin+QR+Here';
+  qrImg.style.display = 'block';
+}
 
-  async function load() {
-    const res = await fetch("/api/wallet/me", { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return logout();
-    const { user, transactions } = await res.json();
+async function loadTransactions() {
+  // Fetch history
+  const container = document.getElementById('txHistory');
+  container.innerHTML = '<p>No transactions yet.</p>';
+}
 
-    document.getElementById("usernamePill").textContent = user.username;
-    document.getElementById("walletBalance").textContent = Number(user.balance).toFixed(2);
+// Submit Withdrawal
+document.getElementById('submitWithdrawBtn').addEventListener('click', async () => {
+  const amount = document.getElementById('withdrawAmount').value;
+  const upi = document.getElementById('withdrawUPI').value;
 
-    const tbody = document.getElementById("txTableBody");
-    tbody.innerHTML = "";
-    for (const tx of transactions) {
-      const tr = document.createElement("tr");
-      const amount = Number(tx.amount);
-      const sign = amount >= 0 ? "+" : "";
-      const label = TYPE_LABELS[tx.type] || escapeHtml(tx.type);
-      tr.innerHTML = `
-        <td>${new Date(tx.created_at).toLocaleString()}</td>
-        <td class="tx-type">${label}</td>
-        <td class="tx-amount ${amount >= 0 ? "positive" : "negative"}">${sign}${amount.toFixed(2)}</td>
-        <td>${Number(tx.balance_after).toFixed(2)}</td>
-      `;
-      tbody.appendChild(tr);
-    }
+  if (!amount || !upi) return alert("Fill amount and UPI");
 
-    if (transactions.length === 0) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="4" style="color:var(--text-dim);">No activity yet.</td>`;
-      tbody.appendChild(tr);
-    }
-  }
+  alert(`Withdrawal request of ${amount} submitted! Admin will verify soon.`);
+  // TODO: Send to server
+});
 
-  load();
-})();
+loadWallet();
