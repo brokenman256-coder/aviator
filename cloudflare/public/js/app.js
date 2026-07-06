@@ -28,6 +28,13 @@
   }
   document.getElementById("logoutBtn").addEventListener("click", logout);
 
+  // ---------- Sound ----------
+  const sfx = window.sfx || { bet() {}, cancel() {}, cashout() {}, crash() {}, takeoff() {}, isMuted: () => true, toggleMute: () => true };
+  const muteBtn = document.getElementById("muteBtn");
+  function renderMute() { muteBtn.textContent = sfx.isMuted() ? "🔇" : "🔊"; }
+  muteBtn.addEventListener("click", () => { sfx.toggleMute(); renderMute(); });
+  renderMute();
+
   async function loadSelf() {
     const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return logout();
@@ -317,6 +324,7 @@
     multiplierTextEl.classList.add("flying");
     stateTextEl.textContent = "Flying…";
     updateRoundBadge(roundId);
+    sfx.takeoff();
     betPanels.forEach((p) => p.onRoundStart());
   });
 
@@ -335,21 +343,25 @@
     stateTextEl.textContent = "Flew away!";
     updateRoundBadge(roundId);
     pushHistory(crashPoint);
+    sfx.crash();
     betPanels.forEach((p) => p.onRoundEnd());
   });
 
   socket.on("bet:placed", ({ slot, balance }) => {
     setBalance(balance);
+    sfx.bet();
     betPanels[slot].onPlaced();
   });
 
   socket.on("bet:cancelled", ({ slot, balance }) => {
     setBalance(balance);
+    sfx.cancel();
     betPanels[slot].onCancelled();
   });
 
   socket.on("bet:cashed_out", ({ slot, multiplier, payout, balance }) => {
     setBalance(balance);
+    sfx.cashout();
     betPanels[slot].onCashedOut(multiplier, payout);
   });
 
