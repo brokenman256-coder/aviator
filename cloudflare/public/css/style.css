@@ -3,19 +3,22 @@
 }
 
 :root {
-  --bg-0: #07070a;
-  --bg-1: #0e0e12;
-  --panel: #131316;
-  --panel-2: #1a1a1f;
-  --border: #2a2a30;
-  --text: #f2ede2;
-  --text-dim: #8a8a92;
-  --gold: #d4af37;
-  --gold-bright: #f0cc6b;
-  --red: #b3221f;
-  --red-bright: #e2453f;
-  --green: #2f8f5b;
-  --green-bright: #3fb374;
+  --bg-0: #0b0b14;
+  --bg-1: #12121d;
+  --panel: #16161f;
+  --panel-2: #1e1e2a;
+  --border: #2b2b3a;
+  --text: #ffffff;
+  --text-dim: #8b8b9c;
+  /* Aviator signature red is the primary accent throughout. */
+  --gold: #e50539;
+  --gold-bright: #ff2d55;
+  --red: #e50539;
+  --red-bright: #ff2d55;
+  --amber: #e6a700;
+  --amber-bright: #ffcb45;
+  --green: #1f9d55;
+  --green-bright: #2ecc71;
 }
 
 html, body {
@@ -24,7 +27,7 @@ html, body {
   min-height: 100%;
   background: var(--bg-0);
   color: var(--text);
-  font-family: "Georgia", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
 }
 
 a { color: var(--gold); }
@@ -59,7 +62,7 @@ a { color: var(--gold); }
   font-weight: 700;
   letter-spacing: 3px;
   font-size: 20px;
-  font-family: "Georgia", serif;
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
   color: var(--gold-bright);
 }
 
@@ -131,7 +134,7 @@ a { color: var(--gold); }
   font-weight: 700;
   font-size: 15px;
   color: var(--gold-bright);
-  font-family: "Georgia", serif;
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* History */
@@ -153,13 +156,13 @@ a { color: var(--gold); }
 }
 
 .history-chip.low { color: var(--text-dim); }
-.history-chip.mid { color: var(--gold-bright); }
+.history-chip.mid { color: var(--amber-bright); }
 .history-chip.high { color: var(--red-bright); }
 
 /* Board */
 .board {
   position: relative;
-  background: radial-gradient(ellipse at 50% 100%, #1a1410 0%, var(--bg-1) 70%);
+  background: radial-gradient(ellipse at 50% 100%, #2a0a18 0%, var(--bg-1) 68%);
   border: 1px solid var(--border);
   border-radius: 6px;
   height: min(46vh, 380px);
@@ -205,7 +208,7 @@ a { color: var(--gold); }
 .site-banner-title {
   font-weight: 700;
   color: var(--gold-bright);
-  font-family: "Georgia", serif;
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
 }
 
@@ -258,19 +261,23 @@ a { color: var(--gold); }
 }
 
 .multiplier-text {
-  font-family: "Georgia", serif;
-  font-size: 54px;
-  font-weight: 700;
-  color: var(--text);
-  text-shadow: 0 0 24px rgba(212, 175, 55, 0.15);
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 60px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 1px;
+  text-shadow: 0 0 26px rgba(255, 45, 85, 0.25);
   transition: color 0.15s ease;
 }
 
-.multiplier-text.flying { color: var(--gold-bright); }
+.multiplier-text.flying {
+  color: #fff;
+  text-shadow: 0 0 30px rgba(255, 45, 85, 0.45);
+}
 
 .multiplier-text.crashed {
   color: var(--red-bright);
-  text-shadow: 0 0 30px rgba(179, 34, 31, 0.6);
+  text-shadow: 0 0 34px rgba(229, 5, 57, 0.7);
 }
 
 .countdown-ring {
@@ -435,8 +442,8 @@ a { color: var(--gold); }
 
 .action-btn .action-amount { font-size: 11px; font-weight: 600; opacity: 0.85; letter-spacing: 0; text-transform: none; }
 
-.bet-btn.state-bet { background: linear-gradient(180deg, var(--gold-bright), var(--gold)); color: #241a02; }
-.bet-btn.state-queued { background: var(--red); color: #fff; }
+.bet-btn.state-bet { background: linear-gradient(180deg, var(--green-bright), var(--green)); color: #062012; }
+.bet-btn.state-queued { background: var(--amber); color: #241a02; }
 .bet-btn.state-active { background: linear-gradient(180deg, var(--red-bright), var(--red)); color: #fff; }
 .bet-btn.state-cashedout { background: var(--panel-2); color: var(--green-bright); border: 1px solid var(--green); }
 .bet-btn.state-lost { background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border); }
@@ -603,7 +610,7 @@ a { color: var(--gold); }
 }
 
 .stat-value {
-  font-family: "Georgia", serif;
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
   font-size: 22px;
   font-weight: 700;
   margin-top: 4px;
@@ -629,7 +636,7 @@ a { color: var(--gold); }
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--gold-bright);
-  font-family: "Georgia", serif;
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
 }
 
 .settings-grid {
@@ -665,7 +672,7 @@ th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: 
 
 .pill.ok { background: rgba(47, 143, 91, 0.15); color: var(--green-bright); }
 .pill.bad { background: rgba(179, 34, 31, 0.15); color: var(--red-bright); }
-.pill.warn { background: rgba(212, 175, 55, 0.15); color: var(--gold-bright); }
+.pill.warn { background: rgba(230, 167, 0, 0.15); color: var(--amber-bright); }
 
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -692,7 +699,7 @@ th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: 
 }
 
 .wallet-balance-value {
-  font-family: "Georgia", serif;
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
   font-size: 36px;
   font-weight: 700;
   color: var(--gold-bright);
@@ -740,5 +747,5 @@ th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: 
   font-weight: 700;
   margin-bottom: 12px;
   color: var(--gold-bright);
-  font-family: "Georgia", serif;
+  font-family: "Inter", "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
 }

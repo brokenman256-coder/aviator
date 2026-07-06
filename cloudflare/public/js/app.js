@@ -428,32 +428,76 @@
     ctx.lineTo(toX(0), h - padding);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, crashed ? "rgba(179,34,31,0.35)" : "rgba(212,175,55,0.28)");
+    grad.addColorStop(0, crashed ? "rgba(229,5,57,0.40)" : "rgba(255,45,85,0.34)");
     grad.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = grad;
     ctx.fill();
 
     ctx.beginPath();
     points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-    ctx.strokeStyle = crashed ? "#e2453f" : "#f0cc6b";
+    ctx.strokeStyle = crashed ? "#e50539" : "#ff2d55";
     ctx.lineWidth = 3;
     ctx.lineJoin = "round";
     ctx.stroke();
 
-    // Vector plane (dart silhouette), oriented along the direction of travel.
-    const PLANE_PATH = new Path2D("M14 0 L2 -4 L-10 -2 L-6 0 L-10 2 L2 4 Z");
+    // Plane, oriented along the direction of travel.
     const [px, py] = points[points.length - 1];
     ctx.save();
     ctx.translate(px, py);
     const prev = points[Math.max(0, points.length - 5)];
     const angle = Math.atan2(py - prev[1], px - prev[0]);
     ctx.rotate(angle);
-    ctx.scale(1.15, 1.15);
-    ctx.fillStyle = crashed ? "#e2453f" : "#f0cc6b";
-    ctx.shadowColor = crashed ? "rgba(226,69,63,0.6)" : "rgba(240,204,107,0.6)";
-    ctx.shadowBlur = 8;
-    ctx.fill(PLANE_PATH);
+    ctx.shadowColor = crashed ? "rgba(229,5,57,0.7)" : "rgba(255,45,85,0.7)";
+    ctx.shadowBlur = 10;
+    drawPlane(ctx, crashed);
     ctx.restore();
+  }
+
+  // Draws a recognizable airplane at the origin, pointing along +x.
+  function drawPlane(ctx, crashed) {
+    const body = crashed ? "#e50539" : "#ff2d55";
+    const trim = crashed ? "#ff5c7a" : "#ffd0dc";
+    ctx.scale(1.3, 1.3);
+
+    // Wings (swept back from the fuselage, top and bottom mirror).
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.moveTo(-2, 0);
+    ctx.lineTo(-14, -13);
+    ctx.lineTo(-6, -2);
+    ctx.lineTo(6, -1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-2, 0);
+    ctx.lineTo(-14, 13);
+    ctx.lineTo(-6, 2);
+    ctx.lineTo(6, 1);
+    ctx.closePath();
+    ctx.fill();
+
+    // Tail fin at the rear.
+    ctx.beginPath();
+    ctx.moveTo(-13, 0);
+    ctx.lineTo(-20, -8);
+    ctx.lineTo(-15, 0);
+    ctx.lineTo(-20, 8);
+    ctx.closePath();
+    ctx.fill();
+
+    // Fuselage.
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 17, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Nose cone highlight + canopy.
+    ctx.fillStyle = trim;
+    ctx.beginPath();
+    ctx.ellipse(11, 0, 6, 3.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(2, -0.5, 4, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // ---------- Render loop ----------
