@@ -9,6 +9,7 @@ const db = require("./db");
 const { hashPassword } = require("./crypto-utils");
 const { ensureDefaults } = require("./store");
 const { GameEngine } = require("./game");
+const { router: tradeRoutes, TradeEngine } = require("./trade");
 
 const authRoutes = require("./auth");
 const adminRoutes = require("./admin");
@@ -45,10 +46,12 @@ app.use(express.static(path.join(__dirname, "..", "public")));
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api/trade", tradeRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server);
 const game = new GameEngine(io);
+const trade = new TradeEngine(io);
 
 io.on("connection", (socket) => {
   const token = socket.handshake.auth && socket.handshake.auth.token;
@@ -94,9 +97,19 @@ io.on("connection", (socket) => {
       socket.emit("bet:error", { slot, error: err.message });
     }
   });
+
+  socket.on("trade:open", ({ symbol, direction, stake, durationSec }) => {
+    try {
+      const result = trade.openContract(userId, symbol, direction, stake, durationSec);
+      socket.emit("trade:opened", result);
+    } catch (err) {
+      socket.emit("trade:error", { error: err.message });
+    }
+  });
 });
 
 server.listen(config.PORT, () => {
   console.log(`Aviator server running on http://localhost:${config.PORT}`);
   game.start();
+  trade.start();
 });

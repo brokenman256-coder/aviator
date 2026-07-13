@@ -5,42 +5,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Aviator — Wallet</title>
 <link rel="stylesheet" href="css/style.css" />
-<style>
-  .payment-box { background:#1f1f1f; padding:20px; border-radius:12px; margin:15px 0; text-align:center; }
-  .qr-img { max-width:280px; border:3px solid gold; border-radius:10px; margin:10px 0; }
-</style>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-name">💰 WALLET</span></div>
+      <div class="brand"><span class="brand-name">WALLET</span></div>
       <div class="topbar-right">
-        <span id="usernamePill"></span>
-        <a href="index.html" class="ghost-btn">Game</a>
-        <button id="logoutBtn" class="ghost-btn">Logout</button>
+        <span id="usernamePill" class="username-pill"></span>
+        <a class="ghost-btn" href="index.html">Aviator</a>
+        <a class="ghost-btn" href="trade.html">Trade</a>
+        <a id="adminLink" class="ghost-btn section-hidden" href="admin.html">Admin</a>
+        <button id="logoutBtn" class="ghost-btn">Log out</button>
       </div>
     </header>
 
     <div class="panel">
-      <h2>Balance: <span id="walletBalance" style="color:#ffd700;">0.00</span></h2>
-    </div>
-
-    <!-- Deposit -->
-    <div class="panel payment-box">
-      <h2>Deposit Funds</h2>
-      <p>Scan this QR to add credits</p>
-      <div id="depositQRContainer">
-        <img id="depositQR" class="qr-img" alt="Deposit QR" style="display:none;">
-        <p id="noQR">Admin QR coming soon...</p>
+      <div class="wallet-summary">
+        <span>Balance</span>
+        <span id="walletBalance" class="wallet-balance-value">0.00</span>
       </div>
     </div>
 
-    <!-- Withdraw -->
+    <div class="panel payment-box">
+      <h2>Add Funds</h2>
+      <p class="info-box">
+        Real-money top-ups aren't wired up yet — this is a placeholder for a future payment
+        integration. For now, ask an admin to credit your account from the Admin panel.
+      </p>
+    </div>
+
     <div class="panel payment-box">
       <h2>Request Withdrawal</h2>
-      <input type="number" id="withdrawAmount" placeholder="Amount" value="100" style="width:100%; padding:12px; margin:10px 0;">
-      <input type="text" id="withdrawUPI" placeholder="Your UPI ID" style="width:100%; padding:12px; margin:10px 0;">
-      <button id="submitWithdrawBtn" style="width:100%; padding:15px; background:#28a745; color:white; border:none; border-radius:8px; font-size:16px;">Submit Withdrawal Request</button>
+      <div class="field">
+        <label>Amount</label>
+        <input type="number" id="withdrawAmount" min="1" step="1" value="100" />
+      </div>
+      <div class="field">
+        <label>Payout destination</label>
+        <input type="text" id="withdrawDestination" placeholder="Bank / UPI / wallet reference" />
+      </div>
+      <button id="submitWithdrawBtn" class="primary-btn" disabled>Withdrawals not yet available</button>
     </div>
 
     <div class="panel">
@@ -48,6 +52,8 @@
       <div id="txHistory"></div>
     </div>
   </div>
+
+  <div id="toast" class="toast hidden"></div>
 
   <script src="js/wallet.js"></script>
 </body>

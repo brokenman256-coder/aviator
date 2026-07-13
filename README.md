@@ -49,6 +49,26 @@ math, not by secretly rigging individual rounds or targeting specific
 players. Round outcomes are generated and enforced server-side, so a
 player can't see or influence the crash point in advance via the browser.
 
+## Zenith Markets (Trade)
+
+Alongside the crash game, this server also runs **Zenith Markets** at
+`/trade.html` — a simple "predict up or down" trading-style game (pick an
+instrument, pick up/down, pick an expiry, win a payout % if you're right).
+Prices are a self-contained simulated random walk, not a live market data
+feed — see the comment at the top of `server/trade.js` for the integration
+point if you ever want to wire in a real price feed. It shares the same
+account, credits balance, and admin panel as the Aviator game. Admins can
+add/edit instruments, payout percentages, and stake limits from **Admin**.
+
+**No real payment processing is wired in anywhere in this app.** The wallet
+page's deposit/withdrawal UI is an intentional placeholder — the only way
+credits move today is an admin manually adjusting a user's balance. Before
+connecting a real payment gateway or accepting real deposits, get proper
+legal/regulatory advice for your jurisdiction: running an up/down trading
+product (or a crash game) for real money is a regulated financial-services
+and/or gambling activity almost everywhere, and Mauritius (like most
+jurisdictions) requires an FSC license for this kind of business.
+
 ## Notes
 
 - Data is stored locally in `data/aviator.db` (SQLite). Delete it to reset

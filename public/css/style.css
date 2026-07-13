@@ -649,3 +649,127 @@ th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: 
   border-radius: 8px;
   border-left: 4px solid #ffd700;
 }
+
+/* Trade (Zenith Markets) */
+.asset-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px;
+}
+
+.asset-tab {
+  flex: 0 0 auto;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.asset-tab .asset-tab-price { display: block; font-size: 11px; color: var(--text-dim); font-weight: 600; }
+
+.asset-tab.active {
+  background: var(--panel);
+  color: var(--gold-bright);
+  border-color: var(--gold);
+}
+
+.asset-tab.active .asset-tab-price { color: var(--gold-bright); }
+
+.trade-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trade-price-value {
+  font-family: "Georgia", serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.trade-price-value.up { color: var(--green-bright); }
+.trade-price-value.down { color: var(--red-bright); }
+
+.trade-payout-note {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.duration-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.duration-btn {
+  flex: 1;
+  min-width: 56px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 4px;
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.duration-btn.active { background: var(--panel); color: var(--gold-bright); border-color: var(--gold); }
+
+.direction-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.direction-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 16px 0;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.direction-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.direction-btn.up { background: linear-gradient(180deg, var(--green-bright), var(--green)); color: #06210f; }
+.direction-btn.down { background: linear-gradient(180deg, var(--red-bright), var(--red)); color: #fff; }
+
+.direction-btn .direction-payout { font-size: 11px; font-weight: 600; opacity: 0.9; letter-spacing: 0; text-transform: none; }
+
+.contract-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.contract-card.won { border-color: var(--green); }
+.contract-card.lost { border-color: var(--red); }
+
+.contract-dir { font-weight: 700; text-transform: uppercase; font-size: 11px; }
+.contract-dir.up { color: var(--green-bright); }
+.contract-dir.down { color: var(--red-bright); }
+
+.contract-result { font-weight: 700; }
+.contract-result.won { color: var(--green-bright); }
+.contract-result.lost { color: var(--red-bright); }
+.contract-result.pending { color: var(--text-dim); }

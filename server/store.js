@@ -6,6 +6,8 @@ const DEFAULTS = {
   signup_bonus_credits: String(config.SIGNUP_BONUS_CREDITS),
   min_bet: "10",
   max_bet: "10000",
+  trade_min_stake: "10",
+  trade_max_stake: "5000",
 };
 
 function ensureDefaults() {
