@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Zenith Markets — Trade</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon"><svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 17L9 11L13 15L21 6"/></svg></span>
+        <span class="brand-name">ZENITH MARKETS</span>
+      </div>
+      <div class="topbar-right">
+        <span id="usernamePill" class="username-pill"></span>
+        <a class="ghost-btn" href="index.html">Aviator</a>
+        <a class="ghost-btn" href="wallet.html">Wallet</a>
+        <a id="adminLink" class="ghost-btn section-hidden" href="admin.html">Admin</a>
+        <div class="balance">
+          <span class="balance-label">Balance</span>
+          <span id="balanceValue" class="balance-value">0.00</span>
+        </div>
+        <button id="logoutBtn" class="ghost-btn">Log out</button>
+      </div>
+    </header>
+
+    <div id="assetTabs" class="asset-tabs"></div>
+
+    <main class="board">
+      <canvas id="canvas"></canvas>
+      <div class="overlay" style="justify-content: flex-start; padding-top: 14px;">
+        <div class="trade-price-row" style="width: 100%; padding: 0 16px; pointer-events: none;">
+          <div>
+            <div id="assetName" class="state-text">—</div>
+            <div id="priceValue" class="trade-price-value">0.00</div>
+          </div>
+          <div class="trade-payout-note" id="payoutNote">Payout: —%</div>
+        </div>
+      </div>
+    </main>
+
+    <section class="bet-panel">
+      <div class="field">
+        <label>Stake</label>
+        <div class="amount-row">
+          <button class="step-btn" data-action="dec">−</button>
+          <input type="number" id="stakeInput" class="amount-input" min="1" step="1" value="50" />
+          <button class="step-btn" data-action="inc">+</button>
+        </div>
+        <div class="preset-row">
+          <button class="preset-btn" data-preset="half">1/2</button>
+          <button class="preset-btn" data-preset="double">2x</button>
+          <button class="preset-btn" data-preset="100">100</button>
+          <button class="preset-btn" data-preset="500">500</button>
+          <button class="preset-btn" data-preset="1000">1000</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Expiry</label>
+        <div id="durationRow" class="duration-row">
+          <button class="duration-btn" data-duration="30">30s</button>
+          <button class="duration-btn active" data-duration="60">60s</button>
+          <button class="duration-btn" data-duration="120">2m</button>
+          <button class="duration-btn" data-duration="300">5m</button>
+        </div>
+      </div>
+
+      <div class="direction-row">
+        <button id="upBtn" class="direction-btn up">
+          <span>▲ UP</span>
+          <span class="direction-payout" id="upPayout">win 0.00</span>
+        </button>
+        <button id="downBtn" class="direction-btn down">
+          <span>▼ DOWN</span>
+          <span class="direction-payout" id="downPayout">win 0.00</span>
+        </button>
+      </div>
+    </section>
+
+    <div class="panel">
+      <h2>Open Trades</h2>
+      <div id="openContracts"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Recent History</h2>
+      <div id="contractHistory"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/trade.js"></script>
+</body>
+</html>

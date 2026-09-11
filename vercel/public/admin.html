@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aviator — Admin</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app wide">
+    <header class="topbar">
+      <div class="brand"><span class="brand-name">ADMIN</span></div>
+      <div class="topbar-right">
+        <span id="usernamePill" class="username-pill"></span>
+        <a href="index.html" class="ghost-btn">Aviator</a>
+        <a href="trade.html" class="ghost-btn">Trade</a>
+        <a href="wallet.html" class="ghost-btn">Wallet</a>
+        <button id="logoutBtn" class="ghost-btn">Logout</button>
+      </div>
+    </header>
+
+    <div id="adminContent">
+      <div class="admin-grid">
+        <div class="stat-card"><div class="stat-label">Users</div><div class="stat-value" id="statUsers">—</div></div>
+        <div class="stat-card"><div class="stat-label">Rounds</div><div class="stat-value" id="statRounds">—</div></div>
+        <div class="stat-card"><div class="stat-label">Wagered</div><div class="stat-value" id="statWagered">—</div></div>
+        <div class="stat-card"><div class="stat-label">Paid Out</div><div class="stat-value" id="statPaidOut">—</div></div>
+        <div class="stat-card"><div class="stat-label">Aviator Profit</div><div class="stat-value" id="statProfit">—</div></div>
+      </div>
+
+      <div class="panel">
+        <h2>Aviator Settings</h2>
+        <div class="settings-grid">
+          <div class="field"><label>House edge (%)</label><input type="number" id="settingHouseEdge" step="0.1"></div>
+          <div class="field"><label>Signup bonus</label><input type="number" id="settingBonus"></div>
+          <div class="field"><label>Min Bet</label><input type="number" id="settingMinBet"></div>
+          <div class="field"><label>Max Bet</label><input type="number" id="settingMaxBet"></div>
+        </div>
+        <button id="saveSettingsBtn" class="primary-btn">Save Settings</button>
+      </div>
+
+      <div class="panel">
+        <h2>Zenith Markets — Trade Stats</h2>
+        <div class="admin-grid">
+          <div class="stat-card"><div class="stat-label">Staked</div><div class="stat-value" id="tradeStatStaked">—</div></div>
+          <div class="stat-card"><div class="stat-label">Paid Out</div><div class="stat-value" id="tradeStatPaidOut">—</div></div>
+          <div class="stat-card"><div class="stat-label">Settled Trades</div><div class="stat-value" id="tradeStatSettled">—</div></div>
+          <div class="stat-card"><div class="stat-label">Trade Profit</div><div class="stat-value" id="tradeStatProfit">—</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Trade Limits</h2>
+        <div class="settings-grid">
+          <div class="field"><label>Min Stake</label><input type="number" id="tradeMinStake"></div>
+          <div class="field"><label>Max Stake</label><input type="number" id="tradeMaxStake"></div>
+        </div>
+        <button id="saveTradeSettingsBtn" class="primary-btn">Save Trade Limits</button>
+      </div>
+
+      <div class="panel">
+        <h2>Trade Instruments</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Symbol</th><th>Name</th><th>Price</th><th>Payout %</th><th>Enabled</th><th>Actions</th></tr></thead>
+            <tbody id="assetsTableBody"></tbody>
+          </table>
+        </div>
+        <h2 style="margin-top: 8px;">Add Instrument</h2>
+        <div class="settings-grid">
+          <div class="field"><label>Symbol</label><input type="text" id="newAssetSymbol" placeholder="SILVER"></div>
+          <div class="field"><label>Name</label><input type="text" id="newAssetName" placeholder="Silver Spot"></div>
+          <div class="field"><label>Starting Price</label><input type="number" id="newAssetPrice" step="0.0001"></div>
+          <div class="field"><label>Volatility</label><input type="number" id="newAssetVolatility" step="0.0001" value="0.001"></div>
+          <div class="field"><label>Payout %</label><input type="number" id="newAssetPayout" value="80"></div>
+        </div>
+        <button id="addAssetBtn" class="primary-btn">Add Instrument</button>
+      </div>
+
+      <div class="panel">
+        <h2>Payment Gateway</h2>
+        <p class="info-box">
+          No real payment provider is connected. Wallet top-ups are manual (admin-adjusted balance below)
+          until a licensed payment/broker integration is added here.
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2>Users</h2>
+        <div class="table-wrap">
+          <table><thead><tr><th>ID</th><th>Username</th><th>Balance</th><th>Actions</th></tr></thead><tbody id="usersTableBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

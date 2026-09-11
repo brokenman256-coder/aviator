@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aviator</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon"><svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M2 12L22 2L14 22L11 13L2 12Z"/></svg></span>
+        <span class="brand-name">AVIATOR</span>
+      </div>
+      <div class="topbar-right">
+        <span id="usernamePill" class="username-pill"></span>
+        <a class="ghost-btn" href="trade.html">Trade</a>
+        <a class="ghost-btn" href="wallet.html">Wallet</a>
+        <a id="adminLink" class="ghost-btn section-hidden" href="admin.html">Admin</a>
+        <div class="balance">
+          <span class="balance-label">Balance</span>
+          <span id="balanceValue" class="balance-value">0.00</span>
+        </div>
+        <button id="logoutBtn" class="ghost-btn">Log out</button>
+      </div>
+    </header>
+
+    <div id="history" class="history"></div>
+
+    <main class="board">
+      <canvas id="canvas"></canvas>
+      <div class="overlay">
+        <div id="stateText" class="state-text">Connecting…</div>
+        <div id="multiplierText" class="multiplier-text">1.00x</div>
+        <div id="countdownRing" class="countdown-ring hidden">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="45" class="ring-bg" />
+            <circle cx="50" cy="50" r="45" class="ring-fg" id="ringFg" />
+          </svg>
+          <span id="countdownText" class="countdown-text">5.0</span>
+        </div>
+      </div>
+    </main>
+
+    <section class="bets">
+      <div class="bet-panel" data-slot="0">
+        <div class="bet-tabs">
+          <button class="bet-tab active" data-tab="bet">Bet</button>
+          <button class="bet-tab" data-tab="auto">Auto</button>
+        </div>
+
+        <div class="bet-tab-content" data-content="bet">
+          <div class="amount-row">
+            <button class="step-btn" data-action="dec">−</button>
+            <input type="number" class="amount-input" min="1" step="1" value="10" />
+            <button class="step-btn" data-action="inc">+</button>
+          </div>
+          <div class="preset-row">
+            <button class="preset-btn" data-preset="half">1/2</button>
+            <button class="preset-btn" data-preset="double">2x</button>
+            <button class="preset-btn" data-preset="100">100</button>
+            <button class="preset-btn" data-preset="500">500</button>
+            <button class="preset-btn" data-preset="1000">1000</button>
+          </div>
+        </div>
+
+        <div class="bet-tab-content hidden" data-content="auto">
+          <label class="auto-toggle">
+            <input type="checkbox" class="auto-enabled" />
+            Auto Cash Out at
+          </label>
+          <div class="auto-target-row">
+            <input type="number" class="auto-target" min="1.01" step="0.01" value="2.00" />
+            <span class="x-suffix">x</span>
+          </div>
+        </div>
+
+        <button class="action-btn bet-btn" data-action="primary">
+          <span class="action-label">BET</span>
+          <span class="action-amount">10.00</span>
+        </button>
+      </div>
+
+      <div class="bet-panel" data-slot="1">
+        <div class="bet-tabs">
+          <button class="bet-tab active" data-tab="bet">Bet</button>
+          <button class="bet-tab" data-tab="auto">Auto</button>
+        </div>
+
+        <div class="bet-tab-content" data-content="bet">
+          <div class="amount-row">
+            <button class="step-btn" data-action="dec">−</button>
+            <input type="number" class="amount-input" min="1" step="1" value="20" />
+            <button class="step-btn" data-action="inc">+</button>
+          </div>
+          <div class="preset-row">
+            <button class="preset-btn" data-preset="half">1/2</button>
+            <button class="preset-btn" data-preset="double">2x</button>
+            <button class="preset-btn" data-preset="100">100</button>
+            <button class="preset-btn" data-preset="500">500</button>
+            <button class="preset-btn" data-preset="1000">1000</button>
+          </div>
+        </div>
+
+        <div class="bet-tab-content hidden" data-content="auto">
+          <label class="auto-toggle">
+            <input type="checkbox" class="auto-enabled" />
+            Auto Cash Out at
+          </label>
+          <div class="auto-target-row">
+            <input type="number" class="auto-target" min="1.01" step="0.01" value="2.00" />
+            <span class="x-suffix">x</span>
+          </div>
+        </div>
+
+        <button class="action-btn bet-btn" data-action="primary">
+          <span class="action-label">BET</span>
+          <span class="action-amount">20.00</span>
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

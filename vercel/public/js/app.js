@@ -1,0 +1,482 @@
+(() => {
+  "use strict";
+
+  const token = localStorage.getItem("aviator_token");
+  if (!token) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  const POLL_MS = 300;
+  const GROWTH_RATE = 0.00009; // must match server/game.js — purely for smooth client-side interpolation
+  function multiplierAt(elapsedMs) {
+    return Math.exp(GROWTH_RATE * elapsedMs);
+  }
+
+  // ---------- Session bootstrap ----------
+  const balanceEl = document.getElementById("balanceValue");
+  const usernamePill = document.getElementById("usernamePill");
+  const adminLink = document.getElementById("adminLink");
+
+  function setBalance(v) {
+    balanceEl.textContent = Number(v).toFixed(2);
+  }
+
+  function logout() {
+    localStorage.removeItem("aviator_token");
+    localStorage.removeItem("aviator_user");
+    window.location.href = "login.html";
+  }
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      ...opts,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts.headers || {}) },
+    });
+    if (res.status === 401) {
+      logout();
+      throw new Error("Session expired");
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Request failed");
+    return data;
+  }
+
+  async function loadSelf() {
+    const { user } = await api("/api/auth/me");
+    localStorage.setItem("aviator_user", JSON.stringify(user));
+    usernamePill.textContent = user.username;
+    setBalance(user.balance);
+    if (user.isAdmin) adminLink.classList.remove("section-hidden");
+  }
+
+  // ---------- Toast ----------
+  const toastEl = document.getElementById("toast");
+  let toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.remove("hidden");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 3000);
+  }
+
+  // ---------- History ----------
+  const historyEl = document.getElementById("history");
+  function pushHistory(point) {
+    const chip = document.createElement("div");
+    let cls = "low";
+    if (point >= 10) cls = "high";
+    else if (point >= 2) cls = "mid";
+    chip.className = `history-chip ${cls}`;
+    chip.textContent = point.toFixed(2) + "x";
+    historyEl.insertBefore(chip, historyEl.firstChild);
+    while (historyEl.children.length > 20) historyEl.removeChild(historyEl.lastChild);
+  }
+
+  async function loadInitialHistory() {
+    try {
+      const { history } = await api("/api/game/history");
+      history.forEach((point) => pushHistory(point));
+    } catch {
+      // non-fatal
+    }
+  }
+
+  // ---------- Game state (polled instead of pushed over a socket) ----------
+  const game = {
+    phase: null,
+    phaseStartLocal: performance.now(),
+    waitMs: 5000,
+    crashPoint: null,
+    currentMultiplier: 1,
+    roundId: null,
+  };
+
+  function onEnterWaiting() {
+    multiplierTextEl.classList.remove("flying", "crashed");
+    multiplierTextEl.textContent = "1.00x";
+    ringEl.classList.remove("hidden");
+    betPanels.forEach((p) => p.onRoundReset());
+  }
+
+  function onEnterRunning() {
+    ringEl.classList.add("hidden");
+    multiplierTextEl.classList.add("flying");
+    stateTextEl.textContent = "Flying…";
+    betPanels.forEach((p) => p.onRoundStart());
+  }
+
+  function onEnterCrashed(crashPoint) {
+    multiplierTextEl.classList.remove("flying");
+    multiplierTextEl.classList.add("crashed");
+    multiplierTextEl.textContent = crashPoint.toFixed(2) + "x";
+    stateTextEl.textContent = "Flew away!";
+    pushHistory(crashPoint);
+    betPanels.forEach((p) => p.onRoundEnd());
+  }
+
+  let polling = false;
+  async function pollState() {
+    if (polling) return;
+    polling = true;
+    try {
+      const state = await api("/api/game/state");
+      const prevPhase = game.phase;
+      const prevRoundId = game.roundId;
+
+      game.phaseStartLocal = performance.now() - state.msInPhase;
+      game.waitMs = state.waitMs;
+      game.currentMultiplier = state.multiplier;
+      game.crashPoint = state.crashPoint;
+      game.roundId = state.roundId;
+
+      const roundChanged = prevRoundId !== null && prevRoundId !== state.roundId;
+      const phaseChanged = prevPhase !== state.state || (roundChanged && state.state === "waiting");
+
+      game.phase = state.state;
+
+      if (phaseChanged) {
+        if (state.state === "waiting") onEnterWaiting();
+        else if (state.state === "running") onEnterRunning();
+        else if (state.state === "crashed") onEnterCrashed(state.crashPoint);
+      }
+
+      betPanels.forEach((p) => p.reconcile(state.myBets.find((b) => b.slot === p.slot), state.state));
+    } catch (err) {
+      if (err.message !== "Session expired") toast(err.message);
+    } finally {
+      polling = false;
+    }
+  }
+
+  // ---------- Bet panels ----------
+  class BetPanel {
+    constructor(rootEl, slot) {
+      this.root = rootEl;
+      this.slot = slot;
+      this.amountInput = rootEl.querySelector(".amount-input");
+      this.autoEnabled = rootEl.querySelector(".auto-enabled");
+      this.autoTarget = rootEl.querySelector(".auto-target");
+      this.actionBtn = rootEl.querySelector(".bet-btn");
+      this.actionLabel = rootEl.querySelector(".action-label");
+      this.actionAmount = rootEl.querySelector(".action-amount");
+
+      this.status = "idle"; // idle | pending | placed | active | cashedout | lost
+      this.amount = Number(this.amountInput.value) || 10;
+
+      this._wireTabs();
+      this._wirePresets();
+      this._wireAmount();
+      this.actionBtn.addEventListener("click", () => this._onAction());
+      this._render();
+    }
+
+    _wireTabs() {
+      const tabs = this.root.querySelectorAll(".bet-tab");
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          tabs.forEach((t) => t.classList.remove("active"));
+          tab.classList.add("active");
+          const target = tab.dataset.tab;
+          this.root.querySelectorAll(".bet-tab-content").forEach((c) => {
+            c.classList.toggle("hidden", c.dataset.content !== target);
+          });
+        });
+      });
+    }
+
+    _wirePresets() {
+      this.root.querySelectorAll(".preset-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (this.status !== "idle") return;
+          const p = btn.dataset.preset;
+          let v = this.amount;
+          if (p === "half") v = Math.max(1, v / 2);
+          else if (p === "double") v = v * 2;
+          else v = Number(p);
+          this.amount = Math.round(v * 100) / 100;
+          this.amountInput.value = this.amount;
+          this._render();
+        });
+      });
+
+      this.root.querySelectorAll(".step-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (this.status !== "idle") return;
+          const dir = btn.dataset.action === "inc" ? 1 : -1;
+          this.amount = Math.max(1, this.amount + dir);
+          this.amountInput.value = this.amount;
+          this._render();
+        });
+      });
+    }
+
+    _wireAmount() {
+      this.amountInput.addEventListener("input", () => {
+        const v = Number(this.amountInput.value);
+        this.amount = isFinite(v) && v > 0 ? v : 1;
+        this._render();
+      });
+    }
+
+    async _onAction() {
+      if (this.status === "idle") {
+        this.status = "pending";
+        this._render();
+        try {
+          const autoCashout = this.autoEnabled.checked ? Number(this.autoTarget.value) : null;
+          const result = await api("/api/game/bet", { method: "POST", body: JSON.stringify({ slot: this.slot, amount: this.amount, autoCashout }) });
+          setBalance(result.balance);
+          this.status = "placed";
+        } catch (err) {
+          toast(err.message);
+          this.status = "idle";
+        }
+        this._render();
+      } else if (this.status === "placed") {
+        this.status = "pending";
+        this._render();
+        try {
+          const result = await api("/api/game/bet/cancel", { method: "POST", body: JSON.stringify({ slot: this.slot }) });
+          setBalance(result.balance);
+          this.status = "idle";
+        } catch (err) {
+          toast(err.message);
+          this.status = "placed";
+        }
+        this._render();
+      } else if (this.status === "active") {
+        try {
+          const result = await api("/api/game/cashout", { method: "POST", body: JSON.stringify({ slot: this.slot }) });
+          setBalance(result.balance);
+          this.status = "cashedout";
+          this.cashOutAt = result.multiplier;
+          this.cashOutPayout = result.payout;
+          this._render();
+        } catch (err) {
+          toast(err.message);
+        }
+      }
+    }
+
+    // Syncs UI status from the server's authoritative view of this slot's bet
+    // for the current round — picks up things a direct action response can't,
+    // like an auto cash-out target another poll settled, or a loss on crash.
+    reconcile(bet, phase) {
+      if (this.status === "pending") return; // an action is in flight — don't fight it
+
+      if (!bet || bet.status === "cancelled") {
+        if (this.status !== "idle") this.onRoundReset();
+        return;
+      }
+      if (bet.status === "active") {
+        this.status = phase === "running" ? "active" : "placed";
+      } else if (bet.status === "cashed_out") {
+        this.status = "cashedout";
+        this.cashOutAt = bet.cashoutMultiplier;
+        this.cashOutPayout = bet.payout;
+      } else if (bet.status === "lost") {
+        this.status = "lost";
+      }
+      this._render();
+    }
+
+    onPlaced() {
+      this.status = "placed";
+      this._render();
+    }
+
+    onCancelled() {
+      this.status = "idle";
+      this._render();
+    }
+
+    onRoundStart() {
+      if (this.status === "placed") this.status = "active";
+      else if (this.status !== "idle") this.status = "idle";
+      this._render();
+    }
+
+    onRoundEnd() {
+      if (this.status === "active") this.status = "lost";
+      this._render();
+    }
+
+    onRoundReset() {
+      this.status = "idle";
+      this.cashOutAt = null;
+      this._render();
+    }
+
+    tickActive() {
+      if (this.status !== "active") return;
+      this.actionAmount.textContent = (this.amount * game.currentMultiplier).toFixed(2);
+    }
+
+    _render() {
+      this.actionBtn.classList.remove("state-bet", "state-queued", "state-active", "state-cashedout", "state-lost");
+      const editable = this.status === "idle";
+      this.amountInput.disabled = !editable;
+      this.autoTarget.disabled = !editable;
+      this.autoEnabled.disabled = !editable;
+      this.actionBtn.disabled = this.status === "pending";
+
+      switch (this.status) {
+        case "idle":
+          this.actionBtn.classList.add("state-bet");
+          this.actionLabel.textContent = game.phase === "waiting" ? "BET" : "WAIT NEXT ROUND";
+          this.actionAmount.textContent = this.amount.toFixed(2);
+          break;
+        case "pending":
+          this.actionLabel.textContent = "…";
+          this.actionAmount.textContent = this.amount.toFixed(2);
+          break;
+        case "placed":
+          this.actionBtn.classList.add("state-queued");
+          this.actionLabel.textContent = "CANCEL";
+          this.actionAmount.textContent = this.amount.toFixed(2);
+          break;
+        case "active":
+          this.actionBtn.classList.add("state-active");
+          this.actionLabel.textContent = "CASH OUT";
+          this.actionAmount.textContent = (this.amount * game.currentMultiplier).toFixed(2);
+          break;
+        case "cashedout":
+          this.actionBtn.classList.add("state-cashedout");
+          this.actionLabel.textContent = "CASHED OUT";
+          this.actionAmount.textContent = this.cashOutAt.toFixed(2) + "x won " + this.cashOutPayout.toFixed(2);
+          break;
+        case "lost":
+          this.actionBtn.classList.add("state-lost");
+          this.actionLabel.textContent = "FLEW AWAY";
+          this.actionAmount.textContent = "-" + this.amount.toFixed(2);
+          break;
+      }
+    }
+  }
+
+  const betPanels = Array.from(document.querySelectorAll(".bet-panel")).map(
+    (el) => new BetPanel(el, Number(el.dataset.slot))
+  );
+
+  // ---------- Canvas ----------
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  function drawFrame(elapsedMs, currentMultiplier, crashed) {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    const padding = 24;
+    const xMax = Math.max(elapsedMs * 1.15, 2000);
+    const yMax = Math.max(currentMultiplier * 1.25, 2);
+
+    const toX = (t) => padding + (t / xMax) * (w - padding * 2);
+    const toY = (m) => h - padding - ((m - 1) / (yMax - 1)) * (h - padding * 2);
+
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 4; i++) {
+      const y = padding + ((h - padding * 2) / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(w - padding, y);
+      ctx.stroke();
+    }
+
+    const steps = 80;
+    const points = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = (elapsedMs * i) / steps;
+      const m = multiplierAt(t);
+      points.push([toX(t), toY(m)]);
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(1));
+    points.forEach(([x, y]) => ctx.lineTo(x, y));
+    ctx.lineTo(points[points.length - 1][0], h - padding);
+    ctx.lineTo(toX(0), h - padding);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, crashed ? "rgba(179,34,31,0.35)" : "rgba(212,175,55,0.28)");
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.strokeStyle = crashed ? "#e2453f" : "#f0cc6b";
+    ctx.lineWidth = 3;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    const PLANE_PATH = new Path2D("M14 0 L2 -4 L-10 -2 L-6 0 L-10 2 L2 4 Z");
+    const [px, py] = points[points.length - 1];
+    ctx.save();
+    ctx.translate(px, py);
+    const prev = points[Math.max(0, points.length - 5)];
+    const angle = Math.atan2(py - prev[1], px - prev[0]);
+    ctx.rotate(angle);
+    ctx.scale(1.15, 1.15);
+    ctx.fillStyle = crashed ? "#e2453f" : "#f0cc6b";
+    ctx.shadowColor = crashed ? "rgba(226,69,63,0.6)" : "rgba(240,204,107,0.6)";
+    ctx.shadowBlur = 8;
+    ctx.fill(PLANE_PATH);
+    ctx.restore();
+  }
+
+  // ---------- Render loop ----------
+  const stateTextEl = document.getElementById("stateText");
+  const multiplierTextEl = document.getElementById("multiplierText");
+  const ringEl = document.getElementById("countdownRing");
+  const ringFg = document.getElementById("ringFg");
+  const countdownTextEl = document.getElementById("countdownText");
+  const RING_CIRC = 283;
+
+  function loop() {
+    const now = performance.now();
+
+    if (game.phase === "waiting") {
+      const elapsed = now - game.phaseStartLocal;
+      const remain = Math.max(0, game.waitMs - elapsed);
+      stateTextEl.textContent = "Next round in…";
+      countdownTextEl.textContent = (remain / 1000).toFixed(1);
+      ringFg.style.strokeDashoffset = String(RING_CIRC * (1 - remain / game.waitMs));
+      drawFrame(0, 1, false);
+    } else if (game.phase === "running") {
+      const elapsed = now - game.phaseStartLocal;
+      const m = Math.min(multiplierAt(elapsed), game.crashPoint || Infinity);
+      game.currentMultiplier = m;
+      multiplierTextEl.textContent = m.toFixed(2) + "x";
+      drawFrame(elapsed, m, false);
+      betPanels.forEach((p) => p.tickActive());
+    } else if (game.phase === "crashed" && game.crashPoint) {
+      const t = Math.log(game.crashPoint) / GROWTH_RATE;
+      drawFrame(t, game.crashPoint, true);
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  async function boot() {
+    await loadSelf();
+    await loadInitialHistory();
+    await pollState();
+    setInterval(pollState, POLL_MS);
+    requestAnimationFrame(loop);
+  }
+  boot();
+})();
