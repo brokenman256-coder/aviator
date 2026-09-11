@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const token = localStorage.getItem("aviator_token");
+  const token = localStorage.getItem("zenith_token");
   if (!token) {
     window.location.href = "login.html";
     return;
@@ -10,8 +10,8 @@
   const usernamePill = document.getElementById("usernamePill");
 
   function logout() {
-    localStorage.removeItem("aviator_token");
-    localStorage.removeItem("aviator_user");
+    localStorage.removeItem("zenith_token");
+    localStorage.removeItem("zenith_user");
     window.location.href = "login.html";
   }
   document.getElementById("logoutBtn").addEventListener("click", logout);

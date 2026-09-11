@@ -1,8 +1,8 @@
 {
-  "name": "aviator-vercel",
+  "name": "zenith-markets-vercel",
   "version": "1.0.0",
   "private": true,
-  "description": "Aviator crash game + Zenith Markets — Vercel serverless build (Postgres-backed, polling instead of Socket.io).",
+  "description": "Zenith Markets — Vercel serverless build (Postgres-backed, polling instead of Socket.io).",
   "main": "api/index.js",
   "scripts": {
     "dev": "node api/index.js"

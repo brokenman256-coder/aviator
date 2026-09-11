@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const token = localStorage.getItem("aviator_token");
+  const token = localStorage.getItem("zenith_token");
   if (!token) {
     window.location.href = "login.html";
     return;
@@ -23,8 +23,8 @@
   }
 
   function logout() {
-    localStorage.removeItem("aviator_token");
-    localStorage.removeItem("aviator_user");
+    localStorage.removeItem("zenith_token");
+    localStorage.removeItem("zenith_user");
     window.location.href = "login.html";
   }
   document.getElementById("logoutBtn").addEventListener("click", logout);
@@ -45,7 +45,7 @@
 
   async function loadSelf() {
     const { user } = await api("/api/auth/me");
-    localStorage.setItem("aviator_user", JSON.stringify(user));
+    localStorage.setItem("zenith_user", JSON.stringify(user));
     usernamePill.textContent = user.username;
     setBalance(user.balance);
     if (user.isAdmin) adminLink.classList.remove("section-hidden");

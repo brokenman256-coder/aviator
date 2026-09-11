@@ -1,11 +1,37 @@
-# Aviator
+# Zenith Markets
 
-A private, credits-only Aviator-style crash game for you and your friends. A
-plane climbs while a multiplier rises; cash out before it "flies away" to win
-your bet times the multiplier. No real money is involved anywhere — every
-balance is virtual credits tracked on your own server.
+A private, credits-only games platform for you and your friends, with two
+game modes:
 
-## Running it
+- **Aviator** — a crash game. A plane climbs while a multiplier rises; cash
+  out before it "flies away" to win your bet times the multiplier.
+- **Trade** — pick an instrument, pick up or down, pick an expiry, and win a
+  payout % if you called it right.
+
+No real money is involved anywhere — every balance is virtual credits
+tracked on your own server. See **No real payment processing** below before
+you even think about changing that.
+
+## Three deployment targets, same product
+
+This repo has three parallel, independently-deployable builds of the same
+app, because they were built for different hosting models:
+
+| Folder       | Host              | Realtime            | Database          |
+|--------------|-------------------|----------------------|--------------------|
+| `server/`    | Railway (or any always-on Node host) | Socket.io (push) | SQLite (local file) |
+| `vercel/`    | Vercel            | HTTP polling         | Postgres (external) |
+| `cloudflare/`| Cloudflare Workers | Durable Objects (push) | D1 (SQLite, managed) |
+
+They're kept in sync feature-for-feature, but each has its own README with
+setup/deploy instructions specific to that host — start there:
+[`server/README.md`](server/README.md) isn't a separate file (this root
+README covers `server/`), [`vercel/README.md`](vercel/README.md),
+[`cloudflare/README.md`](cloudflare/README.md).
+
+The rest of this file covers the `server/` (Railway-style) build.
+
+## Running server/ locally
 
 ```
 npm install
@@ -16,7 +42,7 @@ npm start
 Then open `http://localhost:3000` (redirects to the login page).
 
 On first run, a default admin account is created from the `ADMIN_EMAIL` /
-`ADMIN_PASSWORD` values in `.env` (defaults to `admin@aviator.local` /
+`ADMIN_PASSWORD` values in `.env` (defaults to `admin@zenithmarkets.local` /
 `ChangeMe123!` if unset — **change this** before letting friends use it).
 Log in as that account and open **Admin** from the top bar.
 
@@ -37,8 +63,9 @@ not something you'd want exposed on a public deployment.
 - Tune house edge %, signup bonus, min/max bet — live, no restart needed
 - See aggregate stats: total wagered, total paid out, net house profit
 - See recent round history (crash point, house edge applied)
+- Manage Trade instruments, payout percentages, and stake limits
 
-## How the odds work
+## How the Aviator odds work
 
 Each round's crash point is derived from a fresh random seed, hashed with
 the same style of formula real crash games use, then scaled by the
@@ -49,30 +76,29 @@ math, not by secretly rigging individual rounds or targeting specific
 players. Round outcomes are generated and enforced server-side, so a
 player can't see or influence the crash point in advance via the browser.
 
-## Zenith Markets (Trade)
+## How Trade works
 
-Alongside the crash game, this server also runs **Zenith Markets** at
-`/trade.html` — a simple "predict up or down" trading-style game (pick an
-instrument, pick up/down, pick an expiry, win a payout % if you're right).
 Prices are a self-contained simulated random walk, not a live market data
 feed — see the comment at the top of `server/trade.js` for the integration
-point if you ever want to wire in a real price feed. It shares the same
-account, credits balance, and admin panel as the Aviator game. Admins can
-add/edit instruments, payout percentages, and stake limits from **Admin**.
+point if you ever want to wire in a real price feed. Trade shares the same
+account, credits balance, and admin panel as Aviator.
 
-**No real payment processing is wired in anywhere in this app.** The wallet
-page's deposit/withdrawal UI is an intentional placeholder — the only way
-credits move today is an admin manually adjusting a user's balance. Before
-connecting a real payment gateway or accepting real deposits, get proper
-legal/regulatory advice for your jurisdiction: running an up/down trading
-product (or a crash game) for real money is a regulated financial-services
-and/or gambling activity almost everywhere, and Mauritius (like most
-jurisdictions) requires an FSC license for this kind of business.
+## No real payment processing
+
+**Nothing in this app moves real money, in any of the three builds.** The
+wallet page's deposit/withdrawal UI is an intentional placeholder — the
+only way credits move today is an admin manually adjusting a user's
+balance. Before connecting a real payment gateway or accepting real
+deposits, get proper legal/regulatory advice for your jurisdiction: running
+an up/down trading product (or a crash game) for real money is a regulated
+financial-services and/or gambling activity almost everywhere, and
+Mauritius (like most jurisdictions) requires an FSC license for this kind
+of business.
 
 ## Notes
 
-- Data is stored locally in `data/aviator.db` (SQLite). Delete it to reset
-  everything.
+- `server/` stores data locally in `data/aviator.db` (SQLite). Delete it to
+  reset everything.
 - This is meant for a private group running their own instance — there's no
   payment processing, KYC, or real-money withdrawal path, and it isn't
   intended to be exposed to the public internet as a gambling service.

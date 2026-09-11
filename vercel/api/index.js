@@ -76,7 +76,7 @@ app.use((err, req, res, next) => {
 
 if (require.main === module) {
   const port = Number(process.env.PORT || 3000);
-  app.listen(port, () => console.log(`Aviator (Vercel build) running on http://localhost:${port}`));
+  app.listen(port, () => console.log(`Zenith Markets (Vercel build) running on http://localhost:${port}`));
 }
 
 module.exports = app;

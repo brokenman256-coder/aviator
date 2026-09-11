@@ -1,4 +1,4 @@
-# Aviator + Zenith Markets — Vercel build
+# Zenith Markets — Vercel build
 
 A rewrite of the Node/Express + Socket.io + SQLite app (in `../server`) for
 Vercel's serverless model, since serverless functions can't hold a

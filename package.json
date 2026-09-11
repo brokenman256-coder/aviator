@@ -1,8 +1,8 @@
 {
-  "name": "aviator",
+  "name": "zenith-markets",
   "version": "1.0.0",
   "private": true,
-  "description": "Aviator-style crash game for friends, played with virtual credits.",
+  "description": "Zenith Markets — a private, credits-only Aviator-style crash game and up/down trading game for you and your friends.",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js"

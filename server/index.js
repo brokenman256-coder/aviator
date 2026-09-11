@@ -109,7 +109,7 @@ io.on("connection", (socket) => {
 });
 
 server.listen(config.PORT, () => {
-  console.log(`Aviator server running on http://localhost:${config.PORT}`);
+  console.log(`Zenith Markets server running on http://localhost:${config.PORT}`);
   game.start();
   trade.start();
 });

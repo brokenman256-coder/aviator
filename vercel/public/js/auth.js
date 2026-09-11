@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  if (localStorage.getItem("aviator_token")) {
+  if (localStorage.getItem("zenith_token")) {
     window.location.href = "index.html";
     return;
   }
@@ -53,8 +53,8 @@
   }
 
   function onAuthSuccess(token, user) {
-    localStorage.setItem("aviator_token", token);
-    localStorage.setItem("aviator_user", JSON.stringify(user));
+    localStorage.setItem("zenith_token", token);
+    localStorage.setItem("zenith_user", JSON.stringify(user));
     window.location.href = user.isAdmin ? "index.html" : "index.html";
   }
 

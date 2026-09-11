@@ -25,7 +25,7 @@ async function sendOtp(email, code) {
     await transporter.sendMail({
       from: config.SMTP_FROM,
       to: email,
-      subject: "Your Aviator verification code",
+      subject: "Your Zenith Markets verification code",
       text: `Your verification code is ${code}. It expires in 10 minutes.`,
     });
     return { delivered: true };
