@@ -287,4 +287,103 @@ admin.post("/recharge-requests/:id/reject", async (c) => {
   return c.json({ ok: true });
 });
 
+// ---------- Zenith Markets trade module ----------
+
+async function reloadTradeRoom(env) {
+  const id = env.TRADE_ROOM.idFromName("global");
+  const stub = env.TRADE_ROOM.get(id);
+  await stub.fetch("https://trade-room/admin/reload-assets", { method: "POST" });
+}
+
+admin.get("/trade/assets", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT * FROM trade_assets ORDER BY id").all();
+  return c.json({
+    assets: results.map((a) => ({
+      id: a.id,
+      symbol: a.symbol,
+      name: a.name,
+      price: a.price,
+      volatility: a.volatility,
+      payoutPercent: a.payout_percent,
+      enabled: !!a.enabled,
+    })),
+  });
+});
+
+admin.post("/trade/assets", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { symbol, name, price, volatility, payoutPercent } = body;
+  if (!symbol || !name || !isFinite(Number(price))) {
+    return c.json({ error: "symbol, name, and a numeric price are required" }, 400);
+  }
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO trade_assets (symbol, name, price, volatility, payout_percent, enabled)
+       VALUES (?, ?, ?, ?, ?, 1)`
+    )
+      .bind(String(symbol).toUpperCase(), name, Number(price), Number(volatility) || 0.001, Number(payoutPercent) || 80)
+      .run();
+    await reloadTradeRoom(c.env);
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+admin.post("/trade/assets/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json().catch(() => ({}));
+  const existing = await c.env.DB.prepare("SELECT * FROM trade_assets WHERE id = ?").bind(id).first();
+  if (!existing) return c.json({ error: "Asset not found" }, 404);
+
+  await c.env.DB.prepare(
+    `UPDATE trade_assets SET name = ?, volatility = ?, payout_percent = ?, enabled = ? WHERE id = ?`
+  )
+    .bind(
+      body.name !== undefined ? body.name : existing.name,
+      body.volatility !== undefined ? Number(body.volatility) : existing.volatility,
+      body.payoutPercent !== undefined ? Number(body.payoutPercent) : existing.payout_percent,
+      body.enabled !== undefined ? (body.enabled ? 1 : 0) : existing.enabled,
+      id
+    )
+    .run();
+  await reloadTradeRoom(c.env);
+  return c.json({ ok: true });
+});
+
+admin.get("/trade/settings", async (c) => {
+  return c.json({
+    minStake: Number(await getSetting(c.env.DB, "trade_min_stake")),
+    maxStake: Number(await getSetting(c.env.DB, "trade_max_stake")),
+  });
+});
+
+admin.post("/trade/settings", async (c) => {
+  const { minStake, maxStake } = await c.req.json().catch(() => ({}));
+  if (minStake !== undefined) await setSetting(c.env.DB, "trade_min_stake", Math.max(1, Number(minStake)));
+  if (maxStake !== undefined) await setSetting(c.env.DB, "trade_max_stake", Math.max(1, Number(maxStake)));
+  return c.json({ ok: true });
+});
+
+admin.get("/trade/contracts", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT c.*, a.symbol, u.username FROM trade_contracts c
+     JOIN trade_assets a ON a.id = c.asset_id
+     JOIN users u ON u.id = c.user_id
+     ORDER BY c.id DESC LIMIT 50`
+  ).all();
+  return c.json({ contracts: results });
+});
+
+admin.get("/trade/stats", async (c) => {
+  const totals = await c.env.DB.prepare(
+    `SELECT
+      COALESCE(SUM(stake), 0) AS staked,
+      COALESCE(SUM(CASE WHEN status = 'won' THEN payout ELSE 0 END), 0) AS paidOut,
+      COALESCE(SUM(CASE WHEN status IN ('won', 'lost') THEN 1 ELSE 0 END), 0) AS settledCount
+    FROM trade_contracts`
+  ).first();
+  return c.json({ ...totals, houseProfit: Math.round((totals.staked - totals.paidOut) * 100) / 100 });
+});
+
 export default admin;

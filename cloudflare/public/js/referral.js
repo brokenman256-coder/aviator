@@ -1,15 +1,15 @@
 (() => {
   "use strict";
 
-  const token = localStorage.getItem("aviator_token");
+  const token = localStorage.getItem("zenith_token");
   if (!token) {
     window.location.href = "login.html";
     return;
   }
 
   function logout() {
-    localStorage.removeItem("aviator_token");
-    localStorage.removeItem("aviator_user");
+    localStorage.removeItem("zenith_token");
+    localStorage.removeItem("zenith_user");
     window.location.href = "login.html";
   }
   document.getElementById("logoutBtn").addEventListener("click", logout);
@@ -18,7 +18,7 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  const user = JSON.parse(localStorage.getItem("aviator_user") || "{}");
+  const user = JSON.parse(localStorage.getItem("zenith_user") || "{}");
   document.getElementById("usernamePill").textContent = user.username || "";
 
   async function load() {

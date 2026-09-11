@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const token = localStorage.getItem("aviator_token");
+  const token = localStorage.getItem("zenith_token");
   if (!token) {
     window.location.href = "login.html";
     return;
@@ -17,8 +17,8 @@
   }
 
   function logout() {
-    localStorage.removeItem("aviator_token");
-    localStorage.removeItem("aviator_user");
+    localStorage.removeItem("zenith_token");
+    localStorage.removeItem("zenith_user");
     window.location.href = "login.html";
   }
   document.getElementById("logoutBtn").addEventListener("click", logout);
@@ -442,15 +442,112 @@
     }
   });
 
+  // ---------- Zenith Markets trade module ----------
+
+  async function loadTradeStats() {
+    const s = await api("/trade/stats");
+    document.getElementById("tradeStatStaked").textContent = s.staked.toFixed(2);
+    document.getElementById("tradeStatPaidOut").textContent = s.paidOut.toFixed(2);
+    document.getElementById("tradeStatSettled").textContent = s.settledCount;
+    document.getElementById("tradeStatProfit").textContent = s.houseProfit.toFixed(2);
+  }
+
+  async function loadTradeSettings() {
+    const s = await api("/trade/settings");
+    document.getElementById("tradeMinStake").value = s.minStake;
+    document.getElementById("tradeMaxStake").value = s.maxStake;
+  }
+
+  document.getElementById("saveTradeSettingsBtn").addEventListener("click", async () => {
+    try {
+      await api("/trade/settings", {
+        method: "POST",
+        body: JSON.stringify({
+          minStake: Number(document.getElementById("tradeMinStake").value),
+          maxStake: Number(document.getElementById("tradeMaxStake").value),
+        }),
+      });
+      toast("Trade limits saved.");
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  async function loadAssets() {
+    const { assets } = await api("/trade/assets");
+    const tbody = document.getElementById("assetsTableBody");
+    tbody.innerHTML = assets.map((a) => `
+      <tr>
+        <td>${escapeHtml(a.symbol)}</td>
+        <td>${escapeHtml(a.name)}</td>
+        <td>${a.price.toFixed(4)}</td>
+        <td><input type="number" class="asset-payout-input" data-id="${a.id}" value="${a.payoutPercent}" style="width: 70px;"></td>
+        <td><span class="pill ${a.enabled ? "ok" : "bad"}">${a.enabled ? "enabled" : "disabled"}</span></td>
+        <td class="row-actions">
+          <button class="mini-btn" data-action="save-payout" data-id="${a.id}">Save %</button>
+          <button class="mini-btn" data-action="toggle-asset" data-id="${a.id}" data-enabled="${a.enabled}">${a.enabled ? "Disable" : "Enable"}</button>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  document.getElementById("assetsTableBody").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button.mini-btn");
+    if (!btn) return;
+    const id = btn.dataset.id;
+    try {
+      if (btn.dataset.action === "save-payout") {
+        const payoutPercent = Number(document.querySelector(`.asset-payout-input[data-id="${id}"]`).value);
+        await api(`/trade/assets/${id}`, { method: "POST", body: JSON.stringify({ payoutPercent }) });
+      } else if (btn.dataset.action === "toggle-asset") {
+        const enabled = btn.dataset.enabled !== "true";
+        await api(`/trade/assets/${id}`, { method: "POST", body: JSON.stringify({ enabled }) });
+      }
+      loadAssets();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  document.getElementById("addAssetBtn").addEventListener("click", async () => {
+    try {
+      const symbol = document.getElementById("newAssetSymbol").value.trim();
+      const name = document.getElementById("newAssetName").value.trim();
+      const price = Number(document.getElementById("newAssetPrice").value);
+      const volatility = Number(document.getElementById("newAssetVolatility").value);
+      const payoutPercent = Number(document.getElementById("newAssetPayout").value);
+      if (!symbol || !name || !isFinite(price)) return toast("Symbol, name, and starting price are required.");
+      await api("/trade/assets", { method: "POST", body: JSON.stringify({ symbol, name, price, volatility, payoutPercent }) });
+      document.getElementById("newAssetSymbol").value = "";
+      document.getElementById("newAssetName").value = "";
+      document.getElementById("newAssetPrice").value = "";
+      loadAssets();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
   (async () => {
     const isAdmin = await loadSelf();
     if (!isAdmin) return;
-    await Promise.all([loadStats(), loadSettings(), loadUsers(), loadRounds(), loadLiveRound(), loadRechargeRequests()]);
+    await Promise.all([
+      loadStats(),
+      loadSettings(),
+      loadUsers(),
+      loadRounds(),
+      loadLiveRound(),
+      loadRechargeRequests(),
+      loadTradeStats(),
+      loadTradeSettings(),
+      loadAssets(),
+    ]);
     setInterval(() => {
       loadStats().catch(() => {});
       loadUsers().catch(() => {});
       loadRounds().catch(() => {});
       loadRechargeRequests().catch(() => {});
+      loadTradeStats().catch(() => {});
+      loadAssets().catch(() => {});
     }, 8000);
     setInterval(() => {
       loadLiveRound().catch(() => {});

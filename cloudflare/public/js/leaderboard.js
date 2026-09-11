@@ -1,20 +1,20 @@
 (() => {
   "use strict";
 
-  const token = localStorage.getItem("aviator_token");
+  const token = localStorage.getItem("zenith_token");
   if (!token) {
     window.location.href = "login.html";
     return;
   }
 
   function logout() {
-    localStorage.removeItem("aviator_token");
-    localStorage.removeItem("aviator_user");
+    localStorage.removeItem("zenith_token");
+    localStorage.removeItem("zenith_user");
     window.location.href = "login.html";
   }
   document.getElementById("logoutBtn").addEventListener("click", logout);
 
-  const user = JSON.parse(localStorage.getItem("aviator_user") || "{}");
+  const user = JSON.parse(localStorage.getItem("zenith_user") || "{}");
   document.getElementById("usernamePill").textContent = user.username || "";
 
   const AVATAR_COLORS = ["#e50539", "#7b2ff7", "#1f9d55", "#e6a700", "#2d7dff", "#e05a00", "#c026d3", "#0891b2"];

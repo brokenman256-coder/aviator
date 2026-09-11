@@ -23,11 +23,12 @@ app, because they were built for different hosting models:
 | `vercel/`    | Vercel            | HTTP polling         | Postgres (external) |
 | `cloudflare/`| Cloudflare Workers | Durable Objects (push) | D1 (SQLite, managed) |
 
-They're kept in sync feature-for-feature, but each has its own README with
-setup/deploy instructions specific to that host — start there:
-[`server/README.md`](server/README.md) isn't a separate file (this root
-README covers `server/`), [`vercel/README.md`](vercel/README.md),
-[`cloudflare/README.md`](cloudflare/README.md).
+All three have Aviator + Trade + the core account/wallet/admin system.
+`cloudflare/` has grown some extra features the other two don't (daily bonus
+wheel, referrals, leaderboard) — see its own README for those. Each build
+has setup/deploy instructions specific to that host:
+this file covers `server/`, then see [`vercel/README.md`](vercel/README.md)
+and [`cloudflare/README.md`](cloudflare/README.md) for the other two.
 
 The rest of this file covers the `server/` (Railway-style) build.
 

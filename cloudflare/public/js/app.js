@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const token = localStorage.getItem("aviator_token");
+  const token = localStorage.getItem("zenith_token");
   if (!token) {
     window.location.href = "login.html";
     return;
@@ -22,8 +22,8 @@
   }
 
   function logout() {
-    localStorage.removeItem("aviator_token");
-    localStorage.removeItem("aviator_user");
+    localStorage.removeItem("zenith_token");
+    localStorage.removeItem("zenith_user");
     window.location.href = "login.html";
   }
   document.getElementById("logoutBtn").addEventListener("click", logout);
@@ -51,7 +51,7 @@
     const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return logout();
     const { user } = await res.json();
-    localStorage.setItem("aviator_user", JSON.stringify(user));
+    localStorage.setItem("zenith_user", JSON.stringify(user));
     usernamePill.textContent = user.username;
     setBalance(user.balance);
     if (user.isAdmin) adminLink.classList.remove("section-hidden");
@@ -457,7 +457,7 @@
 
   // ---------- Live bets feed ----------
   (function liveFeed() {
-    const myId = (JSON.parse(localStorage.getItem("aviator_user") || "{}") || {}).id;
+    const myId = (JSON.parse(localStorage.getItem("zenith_user") || "{}") || {}).id;
     const listEl = document.getElementById("feedList");
     const countEl = document.getElementById("feedCount");
     const titleEl = document.getElementById("feedTitle");

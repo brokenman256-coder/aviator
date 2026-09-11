@@ -7,7 +7,9 @@ const DEFAULTS = {
   streak_bonus_per_day: "10",
   wheel_prizes: "100,50,20,30,40,500",
   wheel_weights: "14,24,70,50,40,2",
-  site_name: "SkyDash",
+  site_name: "Zenith Markets",
+  trade_min_stake: "10",
+  trade_max_stake: "5000",
 };
 
 async function getSetting(db, key) {

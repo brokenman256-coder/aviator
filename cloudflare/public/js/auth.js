@@ -3,7 +3,7 @@
 
   const wantsAdmin = new URLSearchParams(location.search).get("admin");
 
-  if (localStorage.getItem("aviator_token")) {
+  if (localStorage.getItem("zenith_token")) {
     window.location.href = wantsAdmin ? "admin.html" : "index.html";
     return;
   }
@@ -68,8 +68,8 @@
   }
 
   function onAuthSuccess(token, user) {
-    localStorage.setItem("aviator_token", token);
-    localStorage.setItem("aviator_user", JSON.stringify(user));
+    localStorage.setItem("zenith_token", token);
+    localStorage.setItem("zenith_user", JSON.stringify(user));
     window.location.href = wantsAdmin && user.isAdmin ? "admin.html" : "index.html";
   }
 

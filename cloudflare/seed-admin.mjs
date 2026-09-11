@@ -2,7 +2,7 @@
 // hashed the same way the Worker verifies it (Web Crypto PBKDF2). Run once
 // against your D1 database after the schema migration:
 //
-//   node seed-admin.mjs "admin@aviator.local" "admin" "your-password" > seed.sql
+//   node seed-admin.mjs "admin@zenithmarkets.local" "admin" "your-password" > seed.sql
 //   wrangler d1 execute aviator-db --remote --file=./seed.sql
 //
 import { hashPassword } from "./src/crypto-utils.js";
